@@ -1,0 +1,32 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+[[mods]]
+modId="craftmine"
+version="1.0.0"
+displayName="CraftMine"
+description='''
+A mod that creates a team-based item hunting game.
+Red team needs to find specific items while blue team tries to stop them.
+Features:
+- Team selection system
+- Random item objectives
+- Configurable game time
+- Item-specific timers
+'''
+authors="SeishiroNagi"
+
+[[dependencies.craftmine]]
+    modId="forge"
+    mandatory=true
+    versionRange="[47,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.craftmine]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.20.1]"
+    ordering="NONE"
+    side="BOTH"
