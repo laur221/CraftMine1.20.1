@@ -19,7 +19,7 @@ public class CraftMine {
     public static final Logger LOGGER = LogManager.getLogger();
     
     public CraftMine() {
-        // Register config first (using COMMON_SPEC instead of SPEC)
+        // The get() methods are deprecated but still functional
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.COMMON_SPEC);
         
         // Setup event bus

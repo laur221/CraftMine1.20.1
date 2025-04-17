@@ -1,14 +1,10 @@
 package com.seishironagi.craftmine;
 
 import com.seishironagi.craftmine.items.GameControllerItem;
-import com.seishironagi.craftmine.gui.*;
 import com.seishironagi.craftmine.client.TimerHudOverlay;
-import net.minecraft.client.gui.screens.MenuScreens;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
-import net.minecraftforge.common.extensions.IForgeMenuType;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -23,32 +19,12 @@ public class ModRegistry {
     
     public static final DeferredRegister<Item> ITEMS = 
             DeferredRegister.create(ForgeRegistries.ITEMS, CraftMine.MOD_ID);
-
-    public static final DeferredRegister<MenuType<?>> MENUS = 
-            DeferredRegister.create(ForgeRegistries.MENU_TYPES, CraftMine.MOD_ID);
     
     public static final RegistryObject<Item> GAME_CONTROLLER_ITEM = 
             ITEMS.register("game_controller", GameControllerItem::new);
 
-    public static final RegistryObject<MenuType<GameMenuContainer>> GAME_MENU = 
-            MENUS.register("game_menu", () -> 
-                    IForgeMenuType.create((windowId, inv, data) -> 
-                            new GameMenuContainer(windowId, inv)));
-
-    public static final RegistryObject<MenuType<GameInfoContainer>> GAME_INFO_CONTAINER =
-            MENUS.register("game_info", () -> 
-                    IForgeMenuType.create((windowId, inv, data) -> 
-                            new GameInfoContainer(windowId, inv)));
-
-    // Register container for settings screen
-    public static final RegistryObject<MenuType<GameSettingsContainer>> GAME_SETTINGS_CONTAINER =
-            MENUS.register("game_settings", () -> 
-                    IForgeMenuType.create((windowId, inv, data) -> 
-                            new GameSettingsContainer(windowId, inv)));
-
     public static void register(IEventBus modEventBus) {
         ITEMS.register(modEventBus);
-        MENUS.register(modEventBus);
         modEventBus.addListener(ModRegistry::addCreative);
     }
 
@@ -70,12 +46,11 @@ public class ModRegistry {
     private static void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
             try {
-                MenuScreens.register(GAME_MENU.get(), GameMenuScreen::new);
-                MenuScreens.register(GAME_INFO_CONTAINER.get(), GameInfoScreen::new);
-                MenuScreens.register(GAME_SETTINGS_CONTAINER.get(), GameSettingsScreen::new);
-                LOGGER.info("Registered all menu screens successfully");
+                // Noile interfețe grafice nu mai necesită înregistrare prin MenuScreens
+                // deoarece sunt deschise direct prin Minecraft.getInstance().setScreen()
+                LOGGER.info("Modern GUI system initialized successfully");
             } catch (Exception e) {
-                LOGGER.error("Failed to register menu screens: " + e.getMessage());
+                LOGGER.error("Failed to initialize GUI system: " + e.getMessage());
             }
         });
     }

@@ -1,86 +1,207 @@
 package com.seishironagi.craftmine.gui;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.seishironagi.craftmine.gui.util.SimpleGUIHelper;
-import com.seishironagi.craftmine.network.ModMessages;
-import com.seishironagi.craftmine.network.packet.*;
+import com.seishironagi.craftmine.gui.GameSettingsScreen;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.inventory.Slot;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraft.sounds.SoundEvents;
+import com.seishironagi.craftmine.network.ModMessages;
+import com.seishironagi.craftmine.network.packet.OpenMainMenuC2SPacket;
 
-@OnlyIn(Dist.CLIENT)
-public class GameMenuScreen extends AbstractContainerScreen<GameMenuContainer> {
-    public GameMenuScreen(GameMenuContainer container, Inventory playerInventory, Component title) {
-        super(container, playerInventory, title);
+import javax.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.List;
+
+public class GameMenuScreen extends Screen {
+    // Button dimensions and colors
+    private static final int BUTTON_WIDTH = 140;
+    private static final int BUTTON_HEIGHT = 25;
+    private static final int BUTTON_SPACING = 6;
+    
+    // Panel dimensions
+    private int backgroundWidth = 200;
+    private int backgroundHeight = 180;
+    private int leftPos;
+    private int topPos;
+    
+    // Button list for animations
+    private final List<AnimatedButton> menuButtons = new ArrayList<>();
+    private float animationTime = 0;
+    private boolean animatingIn = true;
+
+    public GameMenuScreen() {
+        super(Component.literal("§6§lCraftMine Menu"));
+    }
+
+    @Override
+    protected void init() {
+        super.init();
         
-        this.imageWidth = 176;
-        this.imageHeight = 222; // 6 rows chest height
-        this.inventoryLabelY = 128; // Adjusted for 6 rows
+        this.leftPos = (this.width - this.backgroundWidth) / 2;
+        this.topPos = (this.height - this.backgroundHeight) / 2;
+        
+        int centerX = this.width / 2 - BUTTON_WIDTH / 2;
+        int startY = this.topPos + 40;
+        int totalHeight = BUTTON_HEIGHT * 4 + BUTTON_SPACING * 3;
+        startY = this.height / 2 - totalHeight / 2;
+        
+        // Clear existing buttons
+        menuButtons.clear();
+        
+        // Add stylized animated buttons
+        addAnimatedButton(centerX, startY, "§l§eStart Game", b -> startGame());
+        addAnimatedButton(centerX, startY + BUTTON_HEIGHT + BUTTON_SPACING, "§l§bChoose Team", b -> openTeamScreen());
+        addAnimatedButton(centerX, startY + (BUTTON_HEIGHT + BUTTON_SPACING) * 2, "§l§aSettings", b -> openSettingsScreen());
+        addAnimatedButton(centerX, startY + (BUTTON_HEIGHT + BUTTON_SPACING) * 3, "§l§cReturn to Game", b -> this.onClose());
+        
+        // Start animation
+        animationTime = 0;
+        animatingIn = true;
     }
     
-    @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
-        this.renderBackground(guiGraphics);
-        super.render(guiGraphics, mouseX, mouseY, partialTicks);
-        this.renderTooltip(guiGraphics, mouseX, mouseY);
+    private void addAnimatedButton(int x, int y, String text, Button.OnPress handler) {
+        AnimatedButton button = new AnimatedButton(x, y, BUTTON_WIDTH, BUTTON_HEIGHT, 
+                Component.literal(text), handler, menuButtons.size());
+        menuButtons.add(button);
+        this.addRenderableWidget(button);
     }
     
-    @Override
-    protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        SimpleGUIHelper.renderSixRowChestBackground(guiGraphics, leftPos, topPos, imageWidth, imageHeight);
-        
-        // Desenează butoane mai frumoase pentru selecții
-        for (int i = 0; i < 4; i++) {
-            Slot slot = this.menu.slots.get(i);
-            boolean hovered = isHovering(slot.x, slot.y, 16, 16, mouseX, mouseY);
-            SimpleGUIHelper.renderButton(guiGraphics, leftPos + slot.x - 2, topPos + slot.y - 2, 20, 20, hovered);
+    private void startGame() {
+        if (Minecraft.getInstance().player != null) {
+            // Play button click sound
+            Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                
+            ModMessages.sendToServer(new OpenMainMenuC2SPacket());
+            this.onClose();
         }
     }
     
-    @Override
-    protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.drawString(this.font, this.title, 8, 6, 0x404040);
-        guiGraphics.drawString(this.font, this.playerInventoryTitle, 8, this.imageHeight - 96 + 2, 0x404040);
+    private void openTeamScreen() {
+        // Use direct screen opening instead of container approach
+        playClickSound();
+        Minecraft.getInstance().setScreen(new TeamSelectionScreen());
     }
     
+    private void openSettingsScreen() {
+        // Use direct screen opening instead of container approach
+        playClickSound();
+        Minecraft.getInstance().setScreen(new GameSettingsScreen());
+    }
+    
+    private void playClickSound() {
+        Minecraft.getInstance().getSoundManager().play(
+            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+    }
+
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // Handle button clicks in first row
-        for (int i = 0; i < 4; i++) {
-            Slot slot = this.menu.slots.get(i);
-            if (isHovering(slot.x, slot.y, 16, 16, mouseX, mouseY)) {
-                handleButtonClick(i);
-                return true;
-            }
+    public void tick() {
+        super.tick();
+        
+        // Update animation
+        if (animatingIn && animationTime < 1.0f) {
+            animationTime += 0.05f;
+            if (animationTime > 1.0f) animationTime = 1.0f;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        
+        // Update button animations
+        for (AnimatedButton button : menuButtons) {
+            button.updateAnimation(animationTime);
+        }
+    }
+
+    @Override
+    public void render(@Nonnull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // Draw a dark, blurred background
+        this.renderBackground(graphics);
+        
+        // Draw a fancy panel background with gradient
+        renderGradientPanel(graphics);
+        
+        // Draw decorative elements
+        renderDecorations(graphics);
+        
+        // Draw the title with shadow and gradient
+        renderTitle(graphics);
+        
+        // Render the buttons and other widgets
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
     
-    private void handleButtonClick(int buttonId) {
-        switch (buttonId) {
-            case 0: // Start Game
-                ModMessages.sendToServer(new StartGameC2SPacket());
-                this.onClose();
-                break;
-            case 1: // Choose Team
-                ModMessages.sendToServer(new OpenTeamScreenC2SPacket());
-                this.onClose();
-                break;
-            case 2: // Settings
-                ModMessages.sendToServer(new OpenSettingsScreenC2SPacket());
-                this.onClose();
-                break;
-            case 3: // Info
-                ModMessages.sendToServer(new OpenInfoScreenC2SPacket());
-                this.onClose();
-                break;
+    private void renderGradientPanel(GuiGraphics graphics) {
+        // Draw gradient background for panel
+        graphics.fillGradient(
+                leftPos, topPos, 
+                leftPos + backgroundWidth, topPos + backgroundHeight,
+                0x90050505, 0x90352828);
+                
+        // Draw shiny border
+        int borderSize = 2;
+        int time = (int)(System.currentTimeMillis() / 100 % 60);
+        int borderColor = 0xFF901010 + (time * 4 << 16);
+        
+        // Top border
+        graphics.fill(leftPos, topPos, leftPos + backgroundWidth, topPos + borderSize, borderColor);
+        // Left border
+        graphics.fill(leftPos, topPos, leftPos + borderSize, topPos + backgroundHeight, borderColor);
+        // Right border
+        graphics.fill(leftPos + backgroundWidth - borderSize, topPos, leftPos + backgroundWidth, topPos + backgroundHeight, borderColor);
+        // Bottom border
+        graphics.fill(leftPos, topPos + backgroundHeight - borderSize, leftPos + backgroundWidth, topPos + backgroundHeight, borderColor);
+    }
+    
+    private void renderDecorations(GuiGraphics graphics) {
+        // Draw decorative corners
+        int cornerSize = 8;
+        graphics.fill(leftPos, topPos, leftPos + cornerSize, topPos + cornerSize, 0xFFFF5555);
+        graphics.fill(leftPos + backgroundWidth - cornerSize, topPos, leftPos + backgroundWidth, topPos + cornerSize, 0xFFFF5555);
+        graphics.fill(leftPos, topPos + backgroundHeight - cornerSize, leftPos + cornerSize, topPos + backgroundHeight, 0xFFFF5555);
+        graphics.fill(leftPos + backgroundWidth - cornerSize, topPos + backgroundHeight - cornerSize, leftPos + backgroundWidth, topPos + backgroundHeight, 0xFFFF5555);
+    }
+    
+    private void renderTitle(GuiGraphics graphics) {
+        // Draw title with shadow for better readability
+        graphics.drawCenteredString(font, title, this.width / 2, topPos + 15, 0xFFFFAA);
+        
+        // Draw subtitle
+        graphics.drawCenteredString(font, Component.literal("§7Select an option"), 
+                this.width / 2, topPos + 28, 0xBBBBBB);
+    }
+    
+    @Override
+    public boolean isPauseScreen() {
+        return false;
+    }
+    
+    // Custom animated button class
+    private class AnimatedButton extends Button {
+        private final int index;
+        private float animProgress = 0;
+        private int baseX;
+        
+        public AnimatedButton(int x, int y, int width, int height, Component component, OnPress onPress, int index) {
+            super(x - 50, y, width, height, component, onPress, DEFAULT_NARRATION);
+            this.index = index;
+            this.baseX = x;
+            this.active = false; // Start inactive until animation completes
+        }
+        
+        public void updateAnimation(float globalAnimTime) {
+            // Stagger button animations
+            float staggeredTime = Math.max(0, globalAnimTime - (index * 0.15f));
+            this.animProgress = Math.min(1.0f, staggeredTime * 3.0f);
+            
+            // Update position based on animation
+            this.setX((int)(baseX - 50 * (1.0f - animProgress)));
+            
+            // Enable once animation reaches certain threshold
+            this.active = animProgress > 0.7f;
+            
+            // Update opacity
+            this.setAlpha(animProgress);
         }
     }
 }

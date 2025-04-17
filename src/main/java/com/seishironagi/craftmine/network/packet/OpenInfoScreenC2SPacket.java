@@ -1,12 +1,10 @@
 package com.seishironagi.craftmine.network.packet;
 
-import com.seishironagi.craftmine.gui.GameInfoContainer;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.SimpleMenuProvider;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
-import net.minecraftforge.network.NetworkHooks;
 
 import java.util.function.Supplier;
 
@@ -23,12 +21,14 @@ public class OpenInfoScreenC2SPacket {
         context.enqueueWork(() -> {
             ServerPlayer player = context.getSender();
             if (player != null) {
-                NetworkHooks.openScreen(player,
-                    new SimpleMenuProvider(
-                        (windowId, inventory, p) -> new GameInfoContainer(windowId, inventory),
-                        Component.literal("Game Info")
-                    )
-                );
+                // Executăm pe partea client pentru a deschide ecranul
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
+                    net.minecraft.client.Minecraft.getInstance().execute(() -> {
+                        net.minecraft.client.Minecraft.getInstance().setScreen(
+                            new com.seishironagi.craftmine.gui.GameInfoScreen()
+                        );
+                    });
+                });
             }
         });
         return true;
