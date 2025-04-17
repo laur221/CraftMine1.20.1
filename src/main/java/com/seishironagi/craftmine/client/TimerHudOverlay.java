@@ -12,9 +12,9 @@ import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 
 @OnlyIn(Dist.CLIENT)
 public class TimerHudOverlay {
-    private static final ResourceLocation TIMER_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(CraftMine.MODID, "textures/gui/timer.png");
-
+    private static final ResourceLocation TIMER_TEXTURE = 
+            ResourceLocation.tryParse(CraftMine.MOD_ID + ":textures/gui/timer.png");
+    
     public static final IGuiOverlay HUD_TIMER = ((gui, guiGraphics, partialTick, width, height) -> {
         if (!ClientGameData.isGameRunning()) {
             return;

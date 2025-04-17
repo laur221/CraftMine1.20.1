@@ -1,6 +1,5 @@
 package com.seishironagi.craftmine;
 
-import com.seishironagi.craftmine.items.GameControllerItem;
 import com.seishironagi.craftmine.network.ModMessages;
 import com.seishironagi.craftmine.network.packet.GameTimerSyncS2CPacket;
 import net.minecraft.ChatFormatting;
@@ -13,9 +12,8 @@ import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.server.ServerLifecycleHooks;
 
-@Mod.EventBusSubscriber(modid = CraftMine.MODID)
+@Mod.EventBusSubscriber(modid = CraftMine.MOD_ID)
 public class ModEvents {
     
     private static int tickCounter = 0;

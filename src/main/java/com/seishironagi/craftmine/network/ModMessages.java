@@ -19,8 +19,7 @@ public class ModMessages {
 
     public static void register() {
         SimpleChannel net = NetworkRegistry.ChannelBuilder
-                // Use ResourceLocation.fromNamespaceAndPath
-                .named(ResourceLocation.fromNamespaceAndPath(CraftMine.MODID, "messages"))
+                .named(ResourceLocation.tryParse(CraftMine.MOD_ID + ":messages"))
                 .networkProtocolVersion(() -> "1.0")
                 .clientAcceptedVersions(s -> true)
                 .serverAcceptedVersions(s -> true)
@@ -51,6 +50,32 @@ public class ModMessages {
                 .decoder(GameTimerSyncS2CPacket::new)
                 .encoder(GameTimerSyncS2CPacket::toBytes)
                 .consumerMainThread(GameTimerSyncS2CPacket::handle)
+                .add();
+        
+        // Register OpenInfoScreenC2SPacket
+        net.messageBuilder(OpenInfoScreenC2SPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(OpenInfoScreenC2SPacket::new)
+                .encoder(OpenInfoScreenC2SPacket::toBytes)
+                .consumerMainThread(OpenInfoScreenC2SPacket::handle)
+                .add();
+        
+        net.messageBuilder(OpenTeamScreenC2SPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(OpenTeamScreenC2SPacket::new)
+                .encoder(OpenTeamScreenC2SPacket::toBytes)
+                .consumerMainThread(OpenTeamScreenC2SPacket::handle)
+                .add();
+                
+        net.messageBuilder(OpenSettingsScreenC2SPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+            .decoder(OpenSettingsScreenC2SPacket::new)
+            .encoder(OpenSettingsScreenC2SPacket::toBytes)
+            .consumerMainThread(OpenSettingsScreenC2SPacket::handle)
+            .add();
+            
+        // Register OpenMainMenuC2SPacket
+        net.messageBuilder(OpenMainMenuC2SPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(OpenMainMenuC2SPacket::new)
+                .encoder(OpenMainMenuC2SPacket::toBytes)
+                .consumerMainThread(OpenMainMenuC2SPacket::handle)
                 .add();
     }
     

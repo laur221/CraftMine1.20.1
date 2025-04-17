@@ -10,7 +10,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.server.ServerLifecycleHooks;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class GameManager {
     private static GameManager INSTANCE;

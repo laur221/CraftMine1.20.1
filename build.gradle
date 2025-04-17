@@ -112,44 +112,61 @@ minecraft {
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
-    // Put repositories for dependencies here
-    // ForgeGradle automatically adds the Forge maven and Maven Central for you
-
-    // If you have mod jar dependencies in ./libs, you can declare them as a repository like so.
-    // See https://docs.gradle.org/current/userguide/declaring_repositories.html#sub:flat_dir_resolver
-    // flatDir {
-    //     dir 'libs'
-    // }
+    // Just keep the basic repositories
+    mavenCentral() 
 }
 
 dependencies {
-    // Specify the version of Minecraft to use.
-    // Any artifact can be supplied so long as it has a "userdev" classifier artifact and is a compatible patcher artifact.
-    // The "userdev" classifier will be requested and setup by ForgeGradle.
-    // If the group id is "net.minecraft" and the artifact id is one of ["client", "server", "joined"],
-    // then special handling is done to allow a setup of a vanilla dependency without the use of an external repository.
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-
-    // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
-    // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
-    // compileOnly fg.deobf("mezz.jei:jei-${mc_version}-common-api:${jei_version}")
-    // compileOnly fg.deobf("mezz.jei:jei-${mc_version}-forge-api:${jei_version}")
-    // runtimeOnly fg.deobf("mezz.jei:jei-${mc_version}-forge:${jei_version}")
-
-    // Example mod dependency using a mod jar from ./libs with a flat dir repository
-    // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
-    // The group id is ignored when searching -- in this case, it is "blank"
-    // implementation fg.deobf("blank:coolmod-${mc_version}:${coolmod_version}")
-
-    // For more info:
-    // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
-    // http://www.gradle.org/docs/current/userguide/dependency_management.html
+    
+    // Remove all the problematic dependencies (JEI, Patchouli, Bookshelf)
+    // We'll stick to vanilla Minecraft features instead
 }
 
-// This block of code expands all declared replace properties in the specified resource targets.
-// A missing property will result in an error. Properties are expanded using ${} Groovy notation.
-// When "copyIdeResources" is enabled, this will also run before the game launches in IDE environments.
-// See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
+// Add memory settings for Java
+gradle.startParameter.configureOnDemand = false
+
+// Increase memory allocation for the JVM
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    
+    // Fork the compiler process to isolate it
+    options.fork = true
+    
+    // Set compiler memory limits
+    options.forkOptions.jvmArgs += ['-Xmx3G']
+}
+
+// Configure run tasks to have enough memory
+minecraft.runs.configureEach {
+    // Set memory allocation
+    jvmArg "-Xmx3G"
+    jvmArg "-Xms1G"
+    
+    // Add useful JVM arguments for stability
+    jvmArg '-XX:+UseG1GC'
+    jvmArg '-XX:+ParallelRefProcEnabled'
+    jvmArg '-XX:MaxGCPauseMillis=200'
+    jvmArg '-XX:+UnlockExperimentalVMOptions'
+    jvmArg '-XX:+DisableExplicitGC'
+    jvmArg '-XX:+AlwaysPreTouch'
+    jvmArg '-XX:G1NewSizePercent=30' 
+    jvmArg '-XX:G1MaxNewSizePercent=40'
+    jvmArg '-XX:G1HeapRegionSize=8M'
+    jvmArg '-XX:G1ReservePercent=20'
+    jvmArg '-XX:G1HeapWastePercent=5'
+    jvmArg '-XX:G1MixedGCCountTarget=4'
+    jvmArg '-XX:SurvivorRatio=32'
+    jvmArg '-XX:+PerfDisableSharedMem'
+    jvmArg '-XX:MaxTenuringThreshold=1'
+    
+    // Disable Netty’s tryReflectionSetAccessible to avoid the crash
+    jvmArg "-Dio.netty.tryReflectionSetAccessible=false"
+    
+    // Open the internal.misc package so Netty can access Unsafe if needed
+    jvmArg "--add-opens=java.base/jdk.internal.misc=io.netty.common"
+}
+
 tasks.named('processResources', ProcessResources).configure {
     var replaceProperties = [
             minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
@@ -165,7 +182,6 @@ tasks.named('processResources', ProcessResources).configure {
     }
 }
 
-// Example for how to get properties into the manifest for reading at runtime.
 tasks.named('jar', Jar).configure {
     manifest {
         attributes([
@@ -179,16 +195,9 @@ tasks.named('jar', Jar).configure {
         ])
     }
 
-    // This is the preferred method to reobfuscate your jar file
     finalizedBy 'reobfJar'
 }
 
-// However if you are in a multi-project build, dev time needs unobfed jar files, so you can delay the obfuscation until publishing by doing:
-// tasks.named('publish').configure {
-//     dependsOn 'reobfJar'
-// }
-
-// Example configuration to allow publishing using the maven-publish plugin
 publishing {
     publications {
         register('mavenJava', MavenPublication) {
@@ -200,8 +209,4 @@ publishing {
             url "file://${project.projectDir}/mcmodsrepo"
         }
     }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
 }
