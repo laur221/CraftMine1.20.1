@@ -112,17 +112,25 @@ public class GameManager {
         // Store and clear player inventories
         storeAndClearInventories(server);
 
-        // Calculate game time
-        if (Config.useItemSpecificTimes && Config.itemTimes.containsKey(targetItem)) {
-            gameTimeMinutes = Config.itemTimes.get(targetItem);
-        }
+        // Set game time
+        gameTimeMinutes = Config.defaultGameTime;
 
         // Set end time but don't start timer yet - it will start after delay
         gameEndTimeMillis = System.currentTimeMillis() + (gameTimeMinutes * 60 * 1000L);
         timerStarted = false;
 
-        // Teleport players to random locations
-        teleportPlayersToRandomLocations(server);
+        // Get all players in the game
+        List<ServerPlayer> players = server.getPlayerList().getPlayers();
+
+        // Call WorldManager to handle world regeneration and teleportation
+        com.seishironagi.craftmine.world.WorldManager.startNewGame(players);
+
+        // Apply freeze effect to players
+        for (ServerPlayer player : players) {
+            boolean isRedTeam = teamManager.isRedTeam(player);
+            int freezeDuration = isRedTeam ? 5 : 15;
+            applyFreezeEffect(player, freezeDuration);
+        }
 
         // Send messages
         broadcastMessage(Config.gameStartMessage, ChatFormatting.GOLD);
@@ -181,6 +189,27 @@ public class GameManager {
                     endGame(true);
                     return;
                 }
+            }
+        }
+
+        if (server != null) {
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                boolean isRedTeam = teamManager.isRedTeam(player);
+                ItemStack targetItemStack = ItemStack.EMPTY;
+                if (targetItem != null) {
+                    targetItemStack = new ItemStack(targetItem);
+                }
+
+                // Send with item-specific time and current difficulty
+                ModMessages.sendToPlayer(new GameDataSyncS2CPacket(
+                        getRemainingTimeSeconds(), // current time
+                        true, // game running
+                        isRedTeam, // is red team
+                        targetItemStack, // target item
+                        false, // who won (not relevant during game)
+                        Config.gameDifficulty, // game difficulty
+                        gameTimeMinutes // current item time
+                ), player);
             }
         }
     }
@@ -290,12 +319,11 @@ public class GameManager {
 
         // Get all registered items
         for (Item item : ForgeRegistries.ITEMS) {
-            // Skip items from nether or end dimensions or complex items
             String itemId = ForgeRegistries.ITEMS.getKey(item).toString();
             if (itemId == null)
                 continue;
 
-            // Skip items from dimensions that aren't the overworld
+            // Skip items from nether or end dimensions or complex items
             if (itemId.contains("nether") || itemId.contains("end") ||
                     itemId.contains("dragon") || itemId.contains("shulker") ||
                     itemId.contains("elytra") || itemId.contains("chorus") ||
@@ -313,7 +341,19 @@ public class GameManager {
                     itemId.contains("copper_block") || itemId.contains("amethyst") ||
                     itemId.contains("budding") || itemId.contains("calcite") ||
                     itemId.contains("tuff") || itemId.contains("suspicious") ||
-                    itemId.contains("decorated")) {
+                    itemId.contains("decorated") ||
+                    // Exclude silk touch obtainable blocks
+                    itemId.contains("_ore") || // All ore blocks
+                    itemId.contains("ice") || // All ice variants
+                    itemId.contains("glass") || // Glass blocks
+                    itemId.contains("mushroom_block") || // Mushroom blocks
+                    itemId.contains("grass_block") || // Grass blocks
+                    itemId.contains("deepslate") || // Deepslate variants
+                    itemId.contains("amethyst") || // Amethyst related
+                    itemId.contains("mycelium") || // Mycelium
+                    itemId.contains("bookshelf") || // Bookshelves
+                    itemId.contains("campfire") || // Campfires
+                    itemId.contains("beehive")) { // Beehives
                 continue;
             }
 
@@ -343,178 +383,145 @@ public class GameManager {
         return overworldItems;
     }
 
-    private void teleportPlayersToRandomLocations(MinecraftServer server) {
-        // Teleport all players to separate random locations
+    private BlockPos findSafeSpot(ServerLevel level, int x, int z) {
+        Random random = new Random();
+
+        // Try multiple attempts to find a good spawn location
+        for (int attempts = 0; attempts < 100; attempts++) {
+            // Randomize positions slightly after first attempt
+            int testX = attempts == 0 ? x : x + random.nextInt(500) - 250;
+            int testZ = attempts == 0 ? z : z + random.nextInt(500) - 250;
+
+            // Get surface position using WORLD_SURFACE (excludes trees, leaves, etc.)
+            BlockPos surfacePos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, new BlockPos(testX, 0, testZ));
+
+            // Skip if we're too low (likely a cave entrance)
+            if (surfacePos.getY() < 60) {
+                CraftMine.LOGGER.info("Position too low at " + surfacePos + ", likely a cave. Trying new position.");
+                continue;
+            }
+
+            // Check if the biome is an ocean
+            if (level.getBiome(surfacePos).value().getBaseTemperature() < 0.5f &&
+                    level.getBiome(surfacePos).unwrapKey().map(key -> key.location().getPath().contains("ocean"))
+                            .orElse(false)) {
+                CraftMine.LOGGER.info("Found ocean at " + surfacePos + ", trying new position");
+                continue;
+            }
+
+            // Check if block below is solid and not a fluid
+            BlockPos posBelow = surfacePos.below();
+            if (!level.getBlockState(posBelow).isSolid() ||
+                    !level.getFluidState(posBelow).isEmpty()) {
+                CraftMine.LOGGER
+                        .info("Block below is not solid or is fluid at " + surfacePos + ", trying new position");
+                continue;
+            }
+
+            // Check for proper air space for the player (2 blocks)
+            BlockPos playerPos = surfacePos.above();
+            if (!level.getBlockState(playerPos).isAir() ||
+                    !level.getBlockState(playerPos.above()).isAir()) {
+                CraftMine.LOGGER.info("Not enough air space at " + playerPos + ", trying new position");
+                continue;
+            }
+
+            // Final safety check - no water or lava
+            if (level.getFluidState(playerPos).isEmpty() &&
+                    level.getFluidState(playerPos.above()).isEmpty()) {
+                CraftMine.LOGGER.info("Found safe spawn position at: " + playerPos);
+                return playerPos;
+            }
+        }
+
+        // If all attempts failed, use the world spawn point (safest fallback)
+        BlockPos worldSpawn = level.getSharedSpawnPos();
+        CraftMine.LOGGER.warn("Couldn't find safe position after 100 attempts, using world spawn at: " + worldSpawn);
+        return worldSpawn.above();
+    }
+
+    private void createNewGameWorld(MinecraftServer server) {
+        // Since world creation is complex and requires many Minecraft internals,
+        // we'll just use the existing overworld for now
+        ServerLevel overworld = server.getLevel(net.minecraft.world.level.Level.OVERWORLD);
+
+        // Reset player gamemodes
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        }
+
+        // Get a fresh spawn point far from world spawn
+        Random random = new Random();
+        int distance = 1000 + random.nextInt(5000);
+        double angle = random.nextDouble() * Math.PI * 2;
+        int x = (int) (Math.cos(angle) * distance);
+        int z = (int) (Math.sin(angle) * distance);
+
+        BlockPos spawnPos = findSafeSpot(overworld, x, z);
+        CraftMine.LOGGER.info("New game area located at: " + spawnPos);
+    }
+
+    private void startGameInNewWorld(MinecraftServer server) {
         List<ServerPlayer> players = server.getPlayerList().getPlayers();
-        List<BlockPos> usedPositions = new ArrayList<>();
+
+        // Find a new game area
+        Random random = new Random();
+        int distance = 1000 + random.nextInt(5000);
+        double angle = random.nextDouble() * Math.PI * 2;
+        int x = (int) (Math.cos(angle) * distance);
+        int z = (int) (Math.sin(angle) * distance);
+
+        BlockPos gameSpawnPos = findSafeSpot(server.overworld(), x, z);
 
         for (ServerPlayer player : players) {
-            // Restore health and food to maximum
+            // Reset player state
             player.setHealth(player.getMaxHealth());
-            player.getFoodData().setFoodLevel(20); // 20 is full food bar
-            player.getFoodData().setSaturation(20.0f); // Full saturation
+            player.getFoodData().setFoodLevel(20);
+            player.getFoodData().setSaturation(20.0f);
 
-            BlockPos pos = getRandomPosition(player.serverLevel(), usedPositions);
-            usedPositions.add(pos);
+            // Clear inventory
+            player.getInventory().clearContent();
 
-            player.teleportTo(player.serverLevel(), pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+            // Teleport to game spawn
+            player.teleportTo(player.serverLevel(),
+                    gameSpawnPos.getX() + 0.5, gameSpawnPos.getY(), gameSpawnPos.getZ() + 0.5,
                     player.getYRot(), player.getXRot());
 
             // Set spawn point
-            player.setRespawnPosition(player.level().dimension(), pos, player.getYRot(), true, false);
+            player.setRespawnPosition(player.level().dimension(), gameSpawnPos, player.getYRot(), true, false);
 
-            // Apply freeze effect based on team
+            // Apply freeze
             boolean isRedTeam = teamManager.isRedTeam(player);
-            int freezeDuration = isRedTeam ? 5 : 15; // 5 seconds for red team, 15 for blue team
+            int freezeDuration = isRedTeam ? 5 : 15;
             applyFreezeEffect(player, freezeDuration);
 
-            player.sendSystemMessage(Component.literal("Game starting! You've been teleported to a random location.")
-                    .withStyle(ChatFormatting.GREEN));
-            player.sendSystemMessage(Component.literal("Your health and food have been restored!")
-                    .withStyle(ChatFormatting.GREEN));
-            player.sendSystemMessage(Component.literal("You will be frozen for " + freezeDuration + " seconds.")
-                    .withStyle(ChatFormatting.YELLOW));
-            player.sendSystemMessage(Component.literal("Your spawn point has been set at this location.")
+            // Send messages
+            player.sendSystemMessage(
+                    Component.literal("Game starting! All players have been teleported to a random location.")
+                            .withStyle(ChatFormatting.GREEN));
+            player.sendSystemMessage(Component.literal("You will be frozen for " + freezeDuration + " seconds!")
                     .withStyle(ChatFormatting.YELLOW));
         }
     }
-
-    private BlockPos getRandomPosition(ServerLevel level, List<BlockPos> usedPositions) {
-        Random random = new Random();
-        BlockPos pos;
-        boolean validPos = false;
-
-        // Keep trying until we find a position that's far enough from all used
-        // positions
-        do {
-            int minDistance = 500; // Increase minimum distance from spawn
-            int maxDistance = 3000; // Increase maximum distance from spawn
-            int distance = minDistance + random.nextInt(maxDistance - minDistance);
-            double angle = random.nextDouble() * Math.PI * 2;
-
-            int x = (int) (Math.cos(angle) * distance);
-            int z = (int) (Math.sin(angle) * distance);
-
-            pos = findSafeSpot(level, x, z);
-
-            // Check if this position is far enough from all other positions
-            validPos = true;
-            for (BlockPos usedPos : usedPositions) {
-                if (usedPos.distSqr(pos) < 2 * 2) { // Only 2 blocks minimum distance between players
-                    validPos = false;
-                    break;
-                }
-            }
-        } while (!validPos);
-
-        return pos;
-    }
-
-    private BlockPos findSafeSpot(ServerLevel level, int x, int z) {
-        // First try to find a spot at the surface in an open area
-        BlockPos surfacePos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, new BlockPos(x, 0, z));
-
-        // Always go to Y=128 minimum (above most caves)
-        int y = Math.max(surfacePos.getY() + 5, 128);
-
-        // Create a definitely safe position above ground
-        BlockPos safePos = new BlockPos(x, y, z);
-
-        // Make sure the position is safe (air blocks)
-        while (!level.getBlockState(safePos).isAir() || !level.getBlockState(safePos.above()).isAir()) {
-            safePos = safePos.above();
-        }
-
-        CraftMine.LOGGER.info("Created safe position at: " + safePos);
-        return safePos;
-    }
-
-    // Maps to store player inventories
-    private final Map<UUID, List<ItemStack>> playerInventories = new HashMap<>();
-    private final Map<UUID, List<ItemStack>> playerExtraItems = new HashMap<>(); // New map for armor and offhand
 
     private void storeAndClearInventories(MinecraftServer server) {
-        playerInventories.clear();
-        playerExtraItems.clear(); // Clear extra items map too
-
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            // Store inventory (make deep copies of all items)
-            List<ItemStack> inventory = new ArrayList<>();
-            for (ItemStack stack : player.getInventory().items) {
-                inventory.add(stack.isEmpty() ? ItemStack.EMPTY : stack.copy());
-            }
-            playerInventories.put(player.getUUID(), inventory);
-
-            // Also store armor and offhand items
-            List<ItemStack> extraItems = new ArrayList<>();
-            for (ItemStack stack : player.getInventory().armor) {
-                extraItems.add(stack.isEmpty() ? ItemStack.EMPTY : stack.copy());
-            }
-            extraItems.add(player.getInventory().offhand.get(0).copy());
-            playerExtraItems.put(player.getUUID(), extraItems); // Store in the extra items map
-
-            // Clear inventory completely including armor and offhand
+            // Just clear inventory
             player.getInventory().clearContent();
         }
-
-        CraftMine.LOGGER.info("Stored and cleared inventories for {} players", playerInventories.size());
     }
 
     private void restoreInventories(MinecraftServer server) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            UUID playerUUID = player.getUUID();
-
             // Clear current inventory first
             player.getInventory().clearContent();
 
-            if (playerInventories.containsKey(playerUUID)) {
-                // Restore saved main inventory
-                List<ItemStack> savedInventory = playerInventories.get(playerUUID);
-                for (int i = 0; i < Math.min(savedInventory.size(), player.getInventory().items.size()); i++) {
-                    if (i == 0) {
-                        // Skip the first slot - we'll put the controller there later
-                        continue;
-                    }
-
-                    ItemStack stack = savedInventory.get(i);
-                    if (!stack.isEmpty()) {
-                        player.getInventory().items.set(i, stack.copy());
-                    }
-                }
-
-                // Restore armor and offhand if saved
-                if (playerExtraItems.containsKey(playerUUID)) { // Updated to use the new map
-                    List<ItemStack> extraItems = playerExtraItems.get(playerUUID);
-
-                    // Restore armor
-                    for (int i = 0; i < Math.min(extraItems.size() - 1, player.getInventory().armor.size()); i++) {
-                        ItemStack stack = extraItems.get(i);
-                        if (!stack.isEmpty()) {
-                            player.getInventory().armor.set(i, stack.copy());
-                        }
-                    }
-
-                    // Restore offhand
-                    if (extraItems.size() > player.getInventory().armor.size()) {
-                        ItemStack offhandItem = extraItems.get(extraItems.size() - 1);
-                        if (!offhandItem.isEmpty()) {
-                            player.getInventory().offhand.set(0, offhandItem.copy());
-                        }
-                    }
-                }
-            }
-
-            // Always add game controller to first hotbar slot (slot 0)
+            // Add game controller to first hotbar slot (slot 0)
             ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
             player.getInventory().setItem(0, controllerItem);
 
             // Force inventory update
             player.inventoryMenu.broadcastChanges();
-            player.sendSystemMessage(
-                    Component.literal("Game ended. Inventory restored. Game Controller placed in first slot.")
-                            .withStyle(ChatFormatting.GREEN));
         }
-
-        CraftMine.LOGGER.info("Restored inventories for all players");
     }
 }

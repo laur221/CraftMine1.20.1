@@ -3,10 +3,9 @@ package com.seishironagi.craftmine.gui;
 import com.seishironagi.craftmine.Config;
 import com.seishironagi.craftmine.gui.util.GuiTheme;
 import com.seishironagi.craftmine.network.ModMessages;
-import com.seishironagi.craftmine.network.packet.SetGameTimeC2SPacket;
+import com.seishironagi.craftmine.network.packet.SetGameDifficultyC2SPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
@@ -21,23 +20,22 @@ import java.util.List;
 @OnlyIn(Dist.CLIENT)
 public class GameSettingsScreen extends Screen {
     // Panel dimensions
-    private int imageWidth = 200;
-    private int imageHeight = 222;
+    private int imageWidth = 220;
+    private int imageHeight = 180;
     private int leftPos;
     private int topPos;
 
     // Button dimensions
-    private static final int BUTTON_WIDTH = 140;
+    private static final int BUTTON_WIDTH = 160;
     private static final int BUTTON_HEIGHT = 25;
-    private static final int BUTTON_SPACING = 35;
 
     // Animation
-    private final List<AnimatedButton> buttons = new ArrayList<>();
+    private final List<GameControllerScreen.AnimatedButton> buttons = new ArrayList<>();
     private float animationTime = 0;
     private boolean animatingIn = true;
 
-    // Current toggle state for item times
-    private boolean useItemTimes = Config.useItemSpecificTimes;
+    // Settings values
+    private int currentDifficulty = Config.gameDifficulty;
 
     public GameSettingsScreen() {
         super(Component.literal("§a§lGame Settings"));
@@ -46,64 +44,57 @@ public class GameSettingsScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-
         this.leftPos = (this.width - this.imageWidth) / 2;
         this.topPos = (this.height - this.imageHeight) / 2;
 
-        // Add buttons centered correctly
-        int centerX = this.width / 2 - BUTTON_WIDTH / 2;
-        int startY = this.topPos + 40;
-
-        // Clear buttons list
+        // Clear existing buttons
         buttons.clear();
 
-        // Game time settings
-        addAnimatedButton(centerX, startY, "§e§l5 Minutes", b -> setGameTime(5), 0xFFDDAA33);
-        addAnimatedButton(centerX, startY + BUTTON_SPACING, "§e§l10 Minutes", b -> setGameTime(10), 0xFFDDAA33);
-        addAnimatedButton(centerX, startY + BUTTON_SPACING * 2, "§e§l15 Minutes", b -> setGameTime(15), 0xFFDDAA33);
+        // Add difficulty button
+        String difficultyText = "§eDifficulty: §f" + Config.getDifficultyName();
+        addAnimatedButton(this.leftPos + 30, this.topPos + 50, difficultyText, button -> cycleDifficulty(), 0xFFAA33);
 
-        // Toggle item-specific times
-        String toggleText = useItemTimes ? "§b§lItem Times: §a§lON" : "§b§lItem Times: §c§lOFF";
-        addAnimatedButton(centerX, startY + BUTTON_SPACING * 3, toggleText, b -> toggleItemTimes(), 0xFF33AADD);
+        // Add explanation text as a disabled button
+        addAnimatedButton(this.leftPos + 30, this.topPos + 80,
+                "§7Time is based on default settings", button -> {
+                }, 0x888888);
 
-        // Back button
-        addAnimatedButton(centerX, startY + BUTTON_SPACING * 4, "§7§lBack", b -> goBack(), 0xFF888888);
+        // Add current difficulty info as a disabled button
+        addAnimatedButton(this.leftPos + 30, this.topPos + 110,
+                "§7Current difficulty: §e" + Config.getDifficultyName(), button -> {
+                }, 0x888888);
 
-        // Start animation
-        animationTime = 0;
-        animatingIn = true;
+        // Add back button
+        addAnimatedButton(this.leftPos + 30, this.topPos + 140, "§7§lBack", button -> goBackToMenu(), 0x555555);
     }
 
-    private void addAnimatedButton(int x, int y, String text, Button.OnPress handler, int color) {
-        AnimatedButton button = new AnimatedButton(x, y, BUTTON_WIDTH, BUTTON_HEIGHT,
+    private void addAnimatedButton(int x, int y, String text,
+            net.minecraft.client.gui.components.Button.OnPress handler, int color) {
+        GameControllerScreen.AnimatedButton button = new GameControllerScreen.AnimatedButton(
+                x, y, BUTTON_WIDTH, BUTTON_HEIGHT,
                 Component.literal(text), handler, buttons.size(), color);
         buttons.add(button);
         this.addRenderableWidget(button);
     }
 
-    private void setGameTime(int minutes) {
+    private void cycleDifficulty() {
+        // Play click sound
         playClickSound();
-        ModMessages.sendToServer(new SetGameTimeC2SPacket(minutes));
-        this.minecraft.setScreen(null);
+
+        // Update difficulty
+        Config.cycleDifficulty();
+        currentDifficulty = Config.gameDifficulty;
+
+        // Send to server
+        ModMessages.sendToServer(new SetGameDifficultyC2SPacket(currentDifficulty));
+
+        // Recreate the screen with updated values
+        Minecraft.getInstance().setScreen(new GameSettingsScreen());
     }
 
-    private void toggleItemTimes() {
+    private void goBackToMenu() {
         playClickSound();
-
-        // Toggle the local value first
-        useItemTimes = !useItemTimes;
-
-        // Send packet to server
-        ModMessages.sendToServer(new SetGameTimeC2SPacket(-1));
-
-        // Just refresh this screen instead of recreating it
-        this.clearWidgets();
-        this.init();
-    }
-
-    private void goBack() {
-        playClickSound();
-        this.minecraft.setScreen(new GameControllerScreen());
+        Minecraft.getInstance().setScreen(new GameControllerScreen());
     }
 
     private void playClickSound() {
@@ -123,7 +114,7 @@ public class GameSettingsScreen extends Screen {
         }
 
         // Update button animations
-        for (AnimatedButton button : buttons) {
+        for (GameControllerScreen.AnimatedButton button : buttons) {
             button.updateAnimation(animationTime);
         }
     }
@@ -134,88 +125,56 @@ public class GameSettingsScreen extends Screen {
         this.renderBackground(graphics);
 
         // Draw panel
-        renderPanel(graphics);
+        GuiTheme.renderPanel(
+                graphics, leftPos, topPos, imageWidth, imageHeight,
+                0x90054520, 0x90106530);
 
         // Draw the title
         graphics.drawCenteredString(font, this.title, this.width / 2, topPos + 15, 0xFFFFAA);
 
+        // Draw subtitle
+        graphics.drawCenteredString(font, Component.literal("§7Configure game settings"),
+                this.width / 2, topPos + 30, 0xBBBBBB);
+
         // Render widgets
         super.render(graphics, mouseX, mouseY, partialTick);
+
+        // Draw explanatory text
+        drawExplanationBox(graphics, mouseX, mouseY);
     }
 
-    private void renderPanel(GuiGraphics graphics) {
-        GuiTheme.renderPanel(
-                graphics, leftPos, topPos, imageWidth, imageHeight,
-                0x90105010, 0x90307030);
+    private void drawExplanationBox(GuiGraphics graphics, int mouseX, int mouseY) {
+        String explanation = getDifficultyDescription();
+        graphics.drawCenteredString(font, Component.literal(explanation),
+                this.width / 2, this.topPos + this.imageHeight - 25, getDifficultyColor());
+    }
+
+    private String getDifficultyDescription() {
+        switch (currentDifficulty) {
+            case Config.DIFFICULTY_EASY:
+                return "§aEasy: §fShorter game times";
+            case Config.DIFFICULTY_HARD:
+                return "§cHard: §fLonger game times";
+            case Config.DIFFICULTY_MEDIUM:
+            default:
+                return "§6Medium: §fBalanced game times";
+        }
+    }
+
+    private int getDifficultyColor() {
+        switch (currentDifficulty) {
+            case Config.DIFFICULTY_EASY:
+                return 0xFF55FF55;
+            case Config.DIFFICULTY_HARD:
+                return 0xFFFF5555;
+            case Config.DIFFICULTY_MEDIUM:
+            default:
+                return 0xFFFFAA00;
+        }
     }
 
     @Override
     public boolean isPauseScreen() {
         return false;
-    }
-
-    // Custom animated button class with team colors
-    private static class AnimatedButton extends Button {
-        private final int index;
-        private final int buttonColor;
-        private float animProgress = 0;
-        private int baseX;
-
-        public AnimatedButton(int x, int y, int width, int height, Component component,
-                OnPress onPress, int index, int color) {
-            super(x - 50, y, width, height, component, onPress, DEFAULT_NARRATION);
-            this.index = index;
-            this.baseX = x;
-            this.buttonColor = color;
-            this.active = false; // Start inactive until animation completes
-        }
-
-        @Override
-        public void renderWidget(@Nonnull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-            if (this.visible) {
-                // Custom colored button rendering
-                int bgColor = this.buttonColor;
-                if (!this.active) {
-                    bgColor = (bgColor & 0xFFFFFF) | 0x66000000;
-                } else if (this.isHovered) {
-                    bgColor = (bgColor & 0xFFFFFF) | 0xFF000000;
-                }
-
-                graphics.fill(this.getX(), this.getY(),
-                        this.getX() + this.width, this.getY() + this.height,
-                        bgColor);
-
-                // Add border
-                graphics.fill(this.getX(), this.getY(),
-                        this.getX() + this.width, this.getY() + 1, 0xFFFFFFFF);
-                graphics.fill(this.getX(), this.getY(),
-                        this.getX() + 1, this.getY() + this.height, 0xFFFFFFFF);
-                graphics.fill(this.getX() + this.width - 1, this.getY(),
-                        this.getX() + this.width, this.getY() + this.height, 0x99FFFFFF);
-                graphics.fill(this.getX(), this.getY() + this.height - 1,
-                        this.getX() + this.width, this.getY() + this.height, 0x99FFFFFF);
-
-                // Draw text centered
-                int textColor = 0xFFFFFF;
-                graphics.drawCenteredString(Minecraft.getInstance().font,
-                        this.getMessage(), this.getX() + this.width / 2,
-                        this.getY() + (this.height - 8) / 2, textColor);
-            }
-        }
-
-        public void updateAnimation(float globalAnimTime) {
-            // Stagger button animations
-            float staggeredTime = Math.max(0, globalAnimTime - (index * 0.15f));
-            this.animProgress = Math.min(1.0f, staggeredTime * 3.0f);
-
-            // Update position based on animation
-            this.setX((int) (baseX - 50 * (1.0f - animProgress)));
-
-            // Enable once animation reaches certain threshold
-            this.active = animProgress > 0.7f;
-
-            // Update opacity
-            this.setAlpha(animProgress);
-        }
     }
 }

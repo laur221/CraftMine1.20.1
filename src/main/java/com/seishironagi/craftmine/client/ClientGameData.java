@@ -2,7 +2,6 @@ package com.seishironagi.craftmine.client;
 
 import net.minecraft.world.item.ItemStack;
 
-
 public class ClientGameData {
     private static int remainingSeconds = 0;
     private static boolean gameRunning = false;
@@ -11,6 +10,15 @@ public class ClientGameData {
     private static boolean gameJustStarted = false;
     private static boolean gameJustEnded = false;
     private static boolean redTeamWon = false;
+
+    // Add difficulty related fields
+    private static int gameDifficulty = 1; // Default to medium (1)
+    private static int itemTimeMinutes = 10; // Default time in minutes
+
+    // Constants for difficulty levels
+    public static final int DIFFICULTY_EASY = 0;
+    public static final int DIFFICULTY_MEDIUM = 1;
+    public static final int DIFFICULTY_HARD = 2;
 
     public static void setRemainingSeconds(int seconds) {
         remainingSeconds = seconds;
@@ -25,7 +33,7 @@ public class ClientGameData {
             // Game just started
             gameJustStarted = true;
             // Show announcement for 2 seconds
-            AnnouncementOverlay.showAnnouncement("§6§lGame Started!", 0xFFAA00, 2000);
+            AnnouncementOverlay.showAnnouncement("§6§lGame Started!", 0xFFAA00, 5000);
 
             // Schedule announcement to hide after 2 seconds
             new Thread(() -> {
@@ -95,5 +103,33 @@ public class ClientGameData {
 
         // Also reset overlays
         AnnouncementOverlay.reset();
+    }
+
+    public static void setGameDifficulty(int difficulty) {
+        gameDifficulty = difficulty;
+    }
+
+    public static int getGameDifficulty() {
+        return gameDifficulty;
+    }
+
+    public static String getDifficultyName() {
+        switch (gameDifficulty) {
+            case DIFFICULTY_EASY:
+                return "Easy";
+            case DIFFICULTY_HARD:
+                return "Hard";
+            case DIFFICULTY_MEDIUM:
+            default:
+                return "Medium";
+        }
+    }
+
+    public static void setItemTimeMinutes(int minutes) {
+        itemTimeMinutes = minutes;
+    }
+
+    public static int getItemTimeMinutes() {
+        return itemTimeMinutes;
     }
 }

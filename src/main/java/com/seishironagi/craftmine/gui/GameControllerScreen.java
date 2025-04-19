@@ -144,7 +144,7 @@ public class GameControllerScreen extends Screen {
     }
 
     // Custom animated button class with team colors
-    private static class AnimatedButton extends Button {
+    public static class AnimatedButton extends Button {
         private final int index;
         private final int buttonColor;
         private float animProgress = 0;

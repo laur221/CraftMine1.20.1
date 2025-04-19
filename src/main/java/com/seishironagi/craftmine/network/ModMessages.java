@@ -85,6 +85,13 @@ public class ModMessages {
                                 .encoder(GameDataSyncS2CPacket::toBytes)
                                 .consumerMainThread(GameDataSyncS2CPacket::handle)
                                 .add();
+
+                // Register the new packet for setting game difficulty
+                net.messageBuilder(SetGameDifficultyC2SPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                                .decoder(SetGameDifficultyC2SPacket::new)
+                                .encoder(SetGameDifficultyC2SPacket::toBytes)
+                                .consumerMainThread(SetGameDifficultyC2SPacket::handle)
+                                .add();
         }
 
         public static <MSG> void sendToServer(MSG message) {
