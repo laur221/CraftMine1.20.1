@@ -52,8 +52,20 @@ public class Config {
     private static ForgeConfigSpec.ConfigValue<String> blueTeamTaskMessageConfig;
     private static ForgeConfigSpec.ConfigValue<String> redTeamWinMessageConfig;
     private static ForgeConfigSpec.ConfigValue<String> blueTeamWinMessageConfig;
-    private static ForgeConfigSpec.ConfigValue<List<? extends String>> gameItemsConfig;
-    private static ForgeConfigSpec.ConfigValue<List<? extends String>> itemTimesConfig;
+    // Remove old flat lists
+    // private static ForgeConfigSpec.ConfigValue<List<? extends String>>
+    // gameItemsConfig;
+    // private static ForgeConfigSpec.ConfigValue<List<? extends String>>
+    // itemTimesConfig;
+
+    // New grouped lists
+    private static ForgeConfigSpec.ConfigValue<List<? extends String>> easyItemsConfig;
+    private static ForgeConfigSpec.ConfigValue<List<? extends String>> mediumItemsConfig;
+    private static ForgeConfigSpec.ConfigValue<List<? extends String>> hardItemsConfig;
+    // Per‐group time settings
+    private static ForgeConfigSpec.IntValue easyTimeConfig;
+    private static ForgeConfigSpec.IntValue mediumTimeConfig;
+    private static ForgeConfigSpec.IntValue hardTimeConfig;
     private static ForgeConfigSpec.IntValue gameDifficultyConfig;
 
     static {
@@ -65,7 +77,7 @@ public class Config {
 
         useItemSpecificTimesConfig = COMMON_BUILDER
                 .comment("Whether to use item-specific times")
-                .define("useItemSpecificTimes", false); // Setat la false pentru a dezactiva timpii specifici itemurilor
+                .define("useItemSpecificTimes", true); // Enable per-item times by default
 
         redTeamColorConfig = COMMON_BUILDER
                 .comment("Color for Red Team (RGB format)")
@@ -110,20 +122,32 @@ public class Config {
                 "minecraft:gold_ingot",
                 "minecraft:iron_ingot");
 
-        gameItemsConfig = COMMON_BUILDER
-                .comment("List of items that can be assigned as targets")
-                .defineList("gameItems", defaultItems,
+        easyTimeConfig = COMMON_BUILDER
+                .comment("Time (minutes) for EASY items")
+                .defineInRange("easyItemTime", 5, 1, 120);
+        mediumTimeConfig = COMMON_BUILDER
+                .comment("Time (minutes) for MEDIUM items")
+                .defineInRange("mediumItemTime", 10, 1, 120);
+        hardTimeConfig = COMMON_BUILDER
+                .comment("Time (minutes) for HARD items")
+                .defineInRange("hardItemTime", 15, 1, 120);
+
+        // define grouped item lists
+        easyItemsConfig = COMMON_BUILDER
+                .comment("Items classified as EASY")
+                .defineList("easyItems",
+                        Arrays.asList("minecraft:apple", "minecraft:stick"),
                         s -> s instanceof String && ResourceLocation.isValidResourceLocation((String) s));
-
-        List<String> defaultItemTimes = Arrays.asList(
-                "minecraft:diamond:15",
-                "minecraft:emerald:10",
-                "minecraft:gold_ingot:8",
-                "minecraft:iron_ingot:5");
-
-        itemTimesConfig = COMMON_BUILDER
-                .comment("Map of item-specific times (in minutes)")
-                .defineList("itemTimes", defaultItemTimes, s -> s instanceof String);
+        mediumItemsConfig = COMMON_BUILDER
+                .comment("Items classified as MEDIUM")
+                .defineList("mediumItems",
+                        Arrays.asList("minecraft:iron_ingot", "minecraft:bow"),
+                        s -> s instanceof String && ResourceLocation.isValidResourceLocation((String) s));
+        hardItemsConfig = COMMON_BUILDER
+                .comment("Items classified as HARD")
+                .defineList("hardItems",
+                        Arrays.asList("minecraft:diamond", "minecraft:elytra"),
+                        s -> s instanceof String && ResourceLocation.isValidResourceLocation((String) s));
 
         gameDifficultyConfig = COMMON_BUILDER
                 .comment("Game difficulty level (0=Easy, 1=Medium, 2=Hard)")
@@ -154,53 +178,54 @@ public class Config {
             blueTeamWinMessage = blueTeamWinMessageConfig.get();
             gameDifficulty = gameDifficultyConfig.get();
 
+            // retrieve group times
+            int tEasy = easyTimeConfig.get();
+            int tMed = mediumTimeConfig.get();
+            int tHard = hardTimeConfig.get();
+
+            // rebuild items and times by group
             gameItems.clear();
-            for (String itemId : gameItemsConfig.get()) {
-                try {
-                    ResourceLocation id = ResourceLocation.tryParse(itemId);
-                    if (id != null) {
-                        Item item = ForgeRegistries.ITEMS.getValue(id);
-                        if (item != null && item != Items.AIR) {
-                            gameItems.add(item);
-                        } else {
-                            CraftMine.LOGGER.warn("Invalid or missing item in gameItems: {}", itemId);
-                        }
-                    }
-                } catch (Exception e) {
-                    CraftMine.LOGGER.warn("Invalid resource location in gameItems: {}", itemId, e);
-                }
-            }
-
             itemTimes.clear();
-            for (String entry : itemTimesConfig.get()) {
-                try {
-                    String[] parts = entry.split(":");
-                    if (parts.length == 2) {
-                        ResourceLocation id = ResourceLocation.tryParse(parts[0]);
-                        if (id != null) {
-                            Item item = ForgeRegistries.ITEMS.getValue(id);
-                            if (item != null && item != Items.AIR) {
-                                itemTimes.put(item, Integer.parseInt(parts[1]));
-                            } else {
-                                CraftMine.LOGGER.warn("Invalid item in itemTimes: {}", parts[0]);
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    CraftMine.LOGGER.warn("Invalid resource location or time in itemTimes: {}", entry, e);
+
+            for (String idStr : easyItemsConfig.get()) {
+                ResourceLocation id = ResourceLocation.tryParse(idStr);
+                Item it = ForgeRegistries.ITEMS.getValue(id);
+                if (it != null && it != Items.AIR) {
+                    gameItems.add(it);
+                    itemTimes.put(it, tEasy);
+                }
+            }
+            for (String idStr : mediumItemsConfig.get()) {
+                ResourceLocation id = ResourceLocation.tryParse(idStr);
+                Item it = ForgeRegistries.ITEMS.getValue(id);
+                if (it != null && it != Items.AIR) {
+                    gameItems.add(it);
+                    itemTimes.put(it, tMed);
+                }
+            }
+            for (String idStr : hardItemsConfig.get()) {
+                ResourceLocation id = ResourceLocation.tryParse(idStr);
+                Item it = ForgeRegistries.ITEMS.getValue(id);
+                if (it != null && it != Items.AIR) {
+                    gameItems.add(it);
+                    itemTimes.put(it, tHard);
                 }
             }
 
-            CraftMine.LOGGER.info(
-                    "Loaded CraftMine config: {} game items, {} item times",
-                    gameItems.size(), itemTimes.size());
+            CraftMine.LOGGER.info("Loaded CraftMine config: easy={}, med={}, hard={}",
+                    easyItemsConfig.get().size(),
+                    mediumItemsConfig.get().size(),
+                    hardItemsConfig.get().size());
         } catch (Exception e) {
             CraftMine.LOGGER.error("Error loading config: {}", e.getMessage());
         }
     }
 
     public static int getTimeForItem(Item item) {
-        return defaultGameTime; // Returnăm mereu timpul implicit
+        if (useItemSpecificTimes && itemTimes.containsKey(item)) {
+            return itemTimes.get(item);
+        }
+        return defaultGameTime;
     }
 
     public static String getDifficultyName() {

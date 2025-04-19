@@ -4,7 +4,7 @@ license="MIT"
 
 [[mods]]
 modId="craftmine"
-version="1.0.1"
+version="1.0.2"
 displayName="CraftMine"
 description='''
 A mod that creates a team-based item hunting game.

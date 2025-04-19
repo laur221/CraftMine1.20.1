@@ -84,7 +84,6 @@ public class GameManager {
     public void startGame() {
         if (gameRunning)
             return;
-
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         if (server == null)
             return;
@@ -94,6 +93,16 @@ public class GameManager {
             broadcastMessage("Cannot start game: No red team player assigned.", ChatFormatting.RED);
             return;
         }
+
+        // Always use default time, ignore difficulty
+        gameTimeMinutes = Config.defaultGameTime;
+        timerStarted = false;
+
+        // Ensure it's daytime and clear weather in the Overworld
+        ServerLevel overworld = server.overworld();
+        overworld.setDayTime(1000); // dawn
+        // clear rain and thunder immediately
+        overworld.setWeatherParameters(0, 0, false, false);
 
         // Select random item from overworld items
         List<Item> availableItems = getAllOverworldItems();
@@ -109,40 +118,49 @@ public class GameManager {
 
         targetItem = availableItems.get(new Random().nextInt(availableItems.size()));
 
+        // Set game time per item weight
+        gameTimeMinutes = Config.getTimeForItem(targetItem);
+
+        timerStarted = false;
+
         // Store and clear player inventories
         storeAndClearInventories(server);
-
-        // Set game time
-        gameTimeMinutes = Config.defaultGameTime;
-
-        // Set end time but don't start timer yet - it will start after delay
-        gameEndTimeMillis = System.currentTimeMillis() + (gameTimeMinutes * 60 * 1000L);
-        timerStarted = false;
 
         // Get all players in the game
         List<ServerPlayer> players = server.getPlayerList().getPlayers();
 
-        // Call WorldManager to handle world regeneration and teleportation
-        com.seishironagi.craftmine.world.WorldManager.startNewGame(players);
+        // Starting message
+        broadcastMessage("Starting new game! Please wait...", ChatFormatting.GOLD);
 
-        // Apply freeze effect to players
-        for (ServerPlayer player : players) {
-            boolean isRedTeam = teamManager.isRedTeam(player);
-            int freezeDuration = isRedTeam ? 5 : 15;
-            applyFreezeEffect(player, freezeDuration);
-        }
-
-        // Send messages
-        broadcastMessage(Config.gameStartMessage, ChatFormatting.GOLD);
-
-        // Send target message to red team only
+        // First, send target item message to red team
         String itemName = targetItem.getDescription().getString();
         String redMessage = String.format(Config.redTeamTaskMessage, itemName, gameTimeMinutes);
         redPlayer.sendSystemMessage(Component.literal(redMessage).withStyle(ChatFormatting.GOLD));
 
-        // Start timer check task
-        startTimerDisplay();
+        // teleportăm jucătorii în OVERWORLD, coordonate random la distanță mare
+        int base = 2000, range = 3000;
+        for (ServerPlayer p : players) {
+            double ang = Math.random() * Math.PI * 2;
+            int dx = (int) (Math.cos(ang) * (base + Math.random() * range));
+            int dz = (int) (Math.sin(ang) * (base + Math.random() * range));
+            BlockPos safe = findSafeSurfaceLocation(overworld, dx, dz);
+            p.teleportTo(overworld, safe.getX() + 0.5, safe.getY(), safe.getZ() + 0.5, p.getYRot(), p.getXRot());
+            p.setRespawnPosition(overworld.dimension(), safe, p.getYRot(), true, false);
+        }
 
+        // regenerate health & hunger for all players
+        for (ServerPlayer p : players) {
+            p.setHealth(p.getMaxHealth());
+            p.getFoodData().setFoodLevel(20);
+            p.getFoodData().setSaturation(20.0f);
+        }
+
+        // aplicăm freeze și pornim timer
+        for (ServerPlayer p : players) {
+            boolean isRed = teamManager.isRedTeam(p);
+            applyFreezeEffect(p, isRed ? 5 : 15);
+        }
+        startTimerDisplay();
         gameRunning = true;
     }
 
@@ -166,6 +184,7 @@ public class GameManager {
         // Check if timer needs to be started
         if (!timerStarted && System.currentTimeMillis() >= timerStartDelayMillis) {
             timerStarted = true;
+            // Only now set the end time, after the freeze delay has passed
             gameEndTimeMillis = System.currentTimeMillis() + (gameTimeMinutes * 60 * 1000L);
             broadcastMessage("Timer has started! The game is now in progress.", ChatFormatting.GOLD);
         }
@@ -384,60 +403,80 @@ public class GameManager {
     }
 
     private BlockPos findSafeSpot(ServerLevel level, int x, int z) {
-        Random random = new Random();
+        Random rnd = new Random(); // use a local Random instance
 
-        // Try multiple attempts to find a good spawn location
         for (int attempts = 0; attempts < 100; attempts++) {
-            // Randomize positions slightly after first attempt
-            int testX = attempts == 0 ? x : x + random.nextInt(500) - 250;
-            int testZ = attempts == 0 ? z : z + random.nextInt(500) - 250;
+            int testX = attempts == 0 ? x : x + rnd.nextInt(500) - 250;
+            int testZ = attempts == 0 ? z : z + rnd.nextInt(500) - 250;
 
-            // Get surface position using WORLD_SURFACE (excludes trees, leaves, etc.)
-            BlockPos surfacePos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, new BlockPos(testX, 0, testZ));
+            BlockPos surfacePos = level.getHeightmapPos(
+                    Heightmap.Types.WORLD_SURFACE, new BlockPos(testX, 0, testZ));
 
-            // Skip if we're too low (likely a cave entrance)
             if (surfacePos.getY() < 60) {
-                CraftMine.LOGGER.info("Position too low at " + surfacePos + ", likely a cave. Trying new position.");
                 continue;
             }
 
-            // Check if the biome is an ocean
-            if (level.getBiome(surfacePos).value().getBaseTemperature() < 0.5f &&
-                    level.getBiome(surfacePos).unwrapKey().map(key -> key.location().getPath().contains("ocean"))
-                            .orElse(false)) {
-                CraftMine.LOGGER.info("Found ocean at " + surfacePos + ", trying new position");
+            // Correct ocean biome check
+            if (level.getBiome(surfacePos).unwrapKey()
+                    .map(key -> key.location().getPath().contains("ocean"))
+                    .orElse(false)) {
                 continue;
             }
 
-            // Check if block below is solid and not a fluid
-            BlockPos posBelow = surfacePos.below();
-            if (!level.getBlockState(posBelow).isSolid() ||
-                    !level.getFluidState(posBelow).isEmpty()) {
-                CraftMine.LOGGER
-                        .info("Block below is not solid or is fluid at " + surfacePos + ", trying new position");
+            BlockPos below = surfacePos.below();
+            if (!level.getBlockState(below).isSolid() ||
+                    !level.getFluidState(below).isEmpty()) {
                 continue;
             }
 
-            // Check for proper air space for the player (2 blocks)
             BlockPos playerPos = surfacePos.above();
             if (!level.getBlockState(playerPos).isAir() ||
                     !level.getBlockState(playerPos.above()).isAir()) {
-                CraftMine.LOGGER.info("Not enough air space at " + playerPos + ", trying new position");
                 continue;
             }
 
-            // Final safety check - no water or lava
-            if (level.getFluidState(playerPos).isEmpty() &&
-                    level.getFluidState(playerPos.above()).isEmpty()) {
-                CraftMine.LOGGER.info("Found safe spawn position at: " + playerPos);
-                return playerPos;
-            }
+            return playerPos;
         }
 
-        // If all attempts failed, use the world spawn point (safest fallback)
-        BlockPos worldSpawn = level.getSharedSpawnPos();
-        CraftMine.LOGGER.warn("Couldn't find safe position after 100 attempts, using world spawn at: " + worldSpawn);
-        return worldSpawn.above();
+        BlockPos fallback = level.getSharedSpawnPos().above();
+        while (!level.getBlockState(fallback).isAir() ||
+                !level.getBlockState(fallback.above()).isAir()) {
+            fallback = fallback.above();
+        }
+        return fallback;
+    }
+
+    public BlockPos findSafeSurfaceLocation(ServerLevel level, int x, int z) {
+        Random rnd = new Random(); // declare Random here
+
+        for (int i = 0; i < 30; i++) {
+            if (i > 0) {
+                x += rnd.nextInt(200) - 100;
+                z += rnd.nextInt(200) - 100;
+            }
+            // Ensure chunk at (x,z) is loaded/generated
+            level.getChunk(x >> 4, z >> 4);
+            // Now sample top solid block
+            BlockPos pos = level.getHeightmapPos(
+                    Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, new BlockPos(x, 0, z));
+            if (pos.getY() < 60)
+                continue;
+            if (level.getFluidState(pos).isSource() ||
+                    level.getFluidState(pos.below()).isSource())
+                continue;
+            BlockPos above = pos.above();
+            if (!level.getBlockState(above).isAir() ||
+                    !level.getBlockState(above.above()).isAir())
+                continue;
+            return above;
+        }
+
+        BlockPos sp = level.getSharedSpawnPos().above();
+        while (!level.getBlockState(sp).isAir() ||
+                !level.getBlockState(sp.above()).isAir()) {
+            sp = sp.above();
+        }
+        return sp;
     }
 
     private void createNewGameWorld(MinecraftServer server) {
