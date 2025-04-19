@@ -1,6 +1,5 @@
 package com.seishironagi.craftmine.gui;
 
-import com.seishironagi.craftmine.gui.GameSettingsScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;

@@ -2,8 +2,6 @@ package com.seishironagi.craftmine.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -11,11 +9,10 @@ import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 
 @OnlyIn(Dist.CLIENT)
 public class TargetItemOverlay {
-    private static final ResourceLocation WIDGETS = new ResourceLocation("minecraft", "textures/gui/widgets.png");
 
     public static final IGuiOverlay HUD_TARGET_ITEM = ((gui, graphics, partialTick, width, height) -> {
         if (!ClientGameData.isGameRunning() || !ClientGameData.isRedTeam() ||
-                ClientGameData.getTargetItem() == null) {
+                ClientGameData.getTargetItem() == null || ClientGameData.getTargetItem().isEmpty()) {
             return;
         }
 
@@ -26,8 +23,6 @@ public class TargetItemOverlay {
 
         // Get target item
         ItemStack targetItem = ClientGameData.getTargetItem();
-        if (targetItem.isEmpty())
-            return;
 
         // Position next to hotbar for better visibility underground
         int x = width / 2 + 90; // Right side of hotbar

@@ -1,10 +1,8 @@
 package com.seishironagi.craftmine.gui;
 
-import com.seishironagi.craftmine.CraftMine;
 import com.seishironagi.craftmine.gui.util.GuiTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
@@ -19,8 +17,8 @@ import java.util.List;
 @OnlyIn(Dist.CLIENT)
 public class GameInfoScreen extends Screen {
     // Panel dimensions
-    private int imageWidth = 176;
-    private int imageHeight = 222;
+    private int imageWidth = 260;
+    private int imageHeight = 250;
     private int leftPos;
     private int topPos;
 
@@ -46,7 +44,7 @@ public class GameInfoScreen extends Screen {
 
         // Add buttons for navigation
         int centerX = this.width / 2 - BUTTON_WIDTH / 2;
-        int startY = this.topPos + this.imageHeight - 60;
+        int startY = this.topPos + this.imageHeight + 5;
 
         // Clear button list
         buttons.clear();
@@ -117,7 +115,7 @@ public class GameInfoScreen extends Screen {
     }
 
     private void renderInfoContent(GuiGraphics graphics) {
-        int textX = leftPos + 10;
+        int textX = leftPos + 20;
         int textY = topPos + 30;
         int lineHeight = 12;
 

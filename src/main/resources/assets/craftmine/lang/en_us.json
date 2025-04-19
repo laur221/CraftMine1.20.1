@@ -1,4 +1,9 @@
 {
+  "key.category.craftmine": "CraftMine",
+  "key.craftmine.show_recipe": "Show Target Recipe",
+
   "item.craftmine.game_controller": "Game Controller",
-  "container.craftmine.game_menu": "Game Controller"
+  "container.craftmine.game_menu": "Game Controller",
+  "craftmine.game_start": "Game Started!",
+  "craftmine.game_end": "Game Ended!"
 }

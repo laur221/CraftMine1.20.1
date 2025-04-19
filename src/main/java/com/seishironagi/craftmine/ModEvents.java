@@ -156,6 +156,24 @@ public class ModEvents {
                 .withStyle(ChatFormatting.GREEN));
     }
 
+    @SubscribeEvent
+    public static void onPlayerTick(net.minecraftforge.event.TickEvent.PlayerTickEvent event) {
+        if (event.phase == net.minecraftforge.event.TickEvent.Phase.END || event.player.level().isClientSide()) {
+            return;
+        }
+
+        // Check if the player is frozen
+        if (GameManager.getInstance().isGameRunning() && GameManager.getInstance().isPlayerFrozen(event.player)) {
+            // Prevent movement by resetting position and motion
+            event.player.setDeltaMovement(0, event.player.getDeltaMovement().y, 0);
+
+            // Allow slight vertical movement (falling)
+            if (event.player.getDeltaMovement().y > 0) {
+                event.player.setDeltaMovement(0, 0, 0);
+            }
+        }
+    }
+
     private static void teleportToRandomLocation(ServerPlayer player) {
         MinecraftServer server = player.getServer();
         if (server == null)

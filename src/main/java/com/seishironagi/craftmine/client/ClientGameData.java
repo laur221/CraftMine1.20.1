@@ -1,8 +1,7 @@
 package com.seishironagi.craftmine.client;
 
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+
 
 public class ClientGameData {
     private static int remainingSeconds = 0;
@@ -73,10 +72,12 @@ public class ClientGameData {
 
     public static void setTargetItem(ItemStack item) {
         targetItem = item;
-        if (redTeam && item != null && !item.isEmpty()) {
-            // For red team, show a more prominent message about target item
+
+        // Only show announcement when the target item is set for the first time
+        if (redTeam && item != null && !item.isEmpty() && (targetItem == null || targetItem.isEmpty())) {
             String itemName = item.getHoverName().getString();
-            AnnouncementOverlay.showAnnouncement("§e§lYour Target: §f" + itemName, 0xFFDD00, 5000);
+            // Show a temporary announcement instead of persistent message
+            AnnouncementOverlay.showAnnouncement("§e§lTarget: §f" + itemName, 0xFFDD00, 5000);
         }
     }
 

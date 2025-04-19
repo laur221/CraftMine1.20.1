@@ -29,6 +29,11 @@ public class GameManager {
     private final Timer gameTimer = new Timer("GameTimer");
     private TimerTask displayTask;
 
+    // Map to track frozen players and when they should unfreeze
+    private final Map<UUID, Long> frozenPlayers = new HashMap<>();
+    private boolean timerStarted = false;
+    private long timerStartDelayMillis = 0;
+
     private GameManager() {
         this.teamManager = new TeamManager();
     }
@@ -61,6 +66,10 @@ public class GameManager {
     public long getRemainingTimeMillis() {
         if (!gameRunning)
             return 0;
+
+        if (!timerStarted)
+            return gameTimeMinutes * 60 * 1000L;
+
         return Math.max(0, gameEndTimeMillis - System.currentTimeMillis());
     }
 
@@ -108,8 +117,9 @@ public class GameManager {
             gameTimeMinutes = Config.itemTimes.get(targetItem);
         }
 
-        // Set end time
-        gameEndTimeMillis = System.currentTimeMillis() + (gameTimeMinutes * 60 * 1000);
+        // Set end time but don't start timer yet - it will start after delay
+        gameEndTimeMillis = System.currentTimeMillis() + (gameTimeMinutes * 60 * 1000L);
+        timerStarted = false;
 
         // Teleport players to random locations
         teleportPlayersToRandomLocations(server);
@@ -122,7 +132,7 @@ public class GameManager {
         String redMessage = String.format(Config.redTeamTaskMessage, itemName, gameTimeMinutes);
         redPlayer.sendSystemMessage(Component.literal(redMessage).withStyle(ChatFormatting.GOLD));
 
-        // Start timer display
+        // Start timer check task
         startTimerDisplay();
 
         gameRunning = true;
@@ -137,10 +147,20 @@ public class GameManager {
             @Override
             public void run() {
                 checkGameStatus();
+                updateFreezeStatus();
             }
         };
 
-        gameTimer.scheduleAtFixedRate(displayTask, 0, 1000);
+        gameTimer.scheduleAtFixedRate(displayTask, 0, 100); // Run more frequently (100ms)
+    }
+
+    private void updateFreezeStatus() {
+        // Check if timer needs to be started
+        if (!timerStarted && System.currentTimeMillis() >= timerStartDelayMillis) {
+            timerStarted = true;
+            gameEndTimeMillis = System.currentTimeMillis() + (gameTimeMinutes * 60 * 1000L);
+            broadcastMessage("Timer has started! The game is now in progress.", ChatFormatting.GOLD);
+        }
     }
 
     private void checkGameStatus() {
@@ -200,8 +220,11 @@ public class GameManager {
             }
         }
 
+        // Reset game state
         gameRunning = false;
         targetItem = null;
+        timerStarted = false;
+        frozenPlayers.clear();
     }
 
     public void resetGame() {
@@ -217,6 +240,38 @@ public class GameManager {
         gameTimeMinutes = Config.defaultGameTime;
         targetItem = null;
         gameRunning = false;
+        timerStarted = false;
+        frozenPlayers.clear();
+    }
+
+    public void applyFreezeEffect(Player player, int seconds) {
+        long unfreezeTime = System.currentTimeMillis() + (seconds * 1000L);
+        frozenPlayers.put(player.getUUID(), unfreezeTime);
+
+        // If this is the red team player, also delay the timer start
+        if (teamManager.isRedTeam(player)) {
+            timerStarted = false;
+            timerStartDelayMillis = System.currentTimeMillis() + (seconds * 1000L);
+        }
+    }
+
+    public boolean isPlayerFrozen(Player player) {
+        if (!frozenPlayers.containsKey(player.getUUID())) {
+            return false;
+        }
+
+        long unfreezeTime = frozenPlayers.get(player.getUUID());
+        if (System.currentTimeMillis() >= unfreezeTime) {
+            // Player is no longer frozen
+            frozenPlayers.remove(player.getUUID());
+
+            // Notify player
+            player.sendSystemMessage(Component.literal("You are now unfrozen! Go!")
+                    .withStyle(ChatFormatting.GREEN));
+            return false;
+        }
+
+        return true;
     }
 
     private void broadcastMessage(String message, ChatFormatting color) {
@@ -251,7 +306,14 @@ public class GameManager {
                     itemId.contains("blackstone") || itemId.contains("magma") ||
                     itemId.contains("shroomlight") || itemId.contains("wither") ||
                     itemId.contains("gilded") || itemId.contains("blaze") ||
-                    itemId.contains("ghast") || itemId.contains("weeping")) {
+                    itemId.contains("ghast") || itemId.contains("weeping") ||
+                    // Additional excluded items
+                    itemId.contains("skulk") || itemId.contains("oxidized") ||
+                    itemId.contains("exposed") || itemId.contains("weathered") ||
+                    itemId.contains("copper_block") || itemId.contains("amethyst") ||
+                    itemId.contains("budding") || itemId.contains("calcite") ||
+                    itemId.contains("tuff") || itemId.contains("suspicious") ||
+                    itemId.contains("decorated")) {
                 continue;
             }
 
@@ -287,14 +349,33 @@ public class GameManager {
         List<BlockPos> usedPositions = new ArrayList<>();
 
         for (ServerPlayer player : players) {
+            // Restore health and food to maximum
+            player.setHealth(player.getMaxHealth());
+            player.getFoodData().setFoodLevel(20); // 20 is full food bar
+            player.getFoodData().setSaturation(20.0f); // Full saturation
+
             BlockPos pos = getRandomPosition(player.serverLevel(), usedPositions);
             usedPositions.add(pos);
 
             player.teleportTo(player.serverLevel(), pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
                     player.getYRot(), player.getXRot());
 
+            // Set spawn point
+            player.setRespawnPosition(player.level().dimension(), pos, player.getYRot(), true, false);
+
+            // Apply freeze effect based on team
+            boolean isRedTeam = teamManager.isRedTeam(player);
+            int freezeDuration = isRedTeam ? 5 : 15; // 5 seconds for red team, 15 for blue team
+            applyFreezeEffect(player, freezeDuration);
+
             player.sendSystemMessage(Component.literal("Game starting! You've been teleported to a random location.")
                     .withStyle(ChatFormatting.GREEN));
+            player.sendSystemMessage(Component.literal("Your health and food have been restored!")
+                    .withStyle(ChatFormatting.GREEN));
+            player.sendSystemMessage(Component.literal("You will be frozen for " + freezeDuration + " seconds.")
+                    .withStyle(ChatFormatting.YELLOW));
+            player.sendSystemMessage(Component.literal("Your spawn point has been set at this location.")
+                    .withStyle(ChatFormatting.YELLOW));
         }
     }
 
@@ -330,80 +411,110 @@ public class GameManager {
     }
 
     private BlockPos findSafeSpot(ServerLevel level, int x, int z) {
-        // Start at y=320 (max world height in most dimensions) and scan down
-        int startY = Math.min(320, level.getMaxBuildHeight() - 10);
-        BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos(x, startY, z);
+        // First try to find a spot at the surface in an open area
+        BlockPos surfacePos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, new BlockPos(x, 0, z));
 
-        // First, find the top solid block
-        boolean foundSurface = false;
+        // Always go to Y=128 minimum (above most caves)
+        int y = Math.max(surfacePos.getY() + 5, 128);
 
-        // Scan down until we find a non-air block
-        while (mutable.getY() > level.getMinBuildHeight() + 10) {
-            BlockPos pos = mutable.immutable();
+        // Create a definitely safe position above ground
+        BlockPos safePos = new BlockPos(x, y, z);
 
-            // Check if current block is air and block below is solid
-            boolean currentIsAir = level.getBlockState(pos).isAir();
-            boolean belowIsSolid = !level.getBlockState(pos.below()).isAir() &&
-                    !level.getBlockState(pos.below()).getFluidState().isSource();
-
-            if (currentIsAir && belowIsSolid) {
-                // We found a valid position (air with solid block below)
-                CraftMine.LOGGER.info("Found safe teleport position at: " + pos);
-                return pos;
-            }
-
-            mutable.move(0, -1, 0);
+        // Make sure the position is safe (air blocks)
+        while (!level.getBlockState(safePos).isAir() || !level.getBlockState(safePos.above()).isAir()) {
+            safePos = safePos.above();
         }
 
-        // If we reach here, we couldn't find a good spot
-        // Get the height at this position then add 5 blocks to be safe
-        BlockPos surfacePos = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, new BlockPos(x, 0, z));
-        BlockPos safePos = surfacePos.above(5);
-
-        CraftMine.LOGGER.info("Using fallback position at: " + safePos);
+        CraftMine.LOGGER.info("Created safe position at: " + safePos);
         return safePos;
     }
 
-    // Map to store player inventories
+    // Maps to store player inventories
     private final Map<UUID, List<ItemStack>> playerInventories = new HashMap<>();
+    private final Map<UUID, List<ItemStack>> playerExtraItems = new HashMap<>(); // New map for armor and offhand
 
     private void storeAndClearInventories(MinecraftServer server) {
         playerInventories.clear();
+        playerExtraItems.clear(); // Clear extra items map too
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            // Store inventory
+            // Store inventory (make deep copies of all items)
             List<ItemStack> inventory = new ArrayList<>();
             for (ItemStack stack : player.getInventory().items) {
-                inventory.add(stack.copy());
+                inventory.add(stack.isEmpty() ? ItemStack.EMPTY : stack.copy());
             }
             playerInventories.put(player.getUUID(), inventory);
 
-            // Clear inventory
+            // Also store armor and offhand items
+            List<ItemStack> extraItems = new ArrayList<>();
+            for (ItemStack stack : player.getInventory().armor) {
+                extraItems.add(stack.isEmpty() ? ItemStack.EMPTY : stack.copy());
+            }
+            extraItems.add(player.getInventory().offhand.get(0).copy());
+            playerExtraItems.put(player.getUUID(), extraItems); // Store in the extra items map
+
+            // Clear inventory completely including armor and offhand
             player.getInventory().clearContent();
         }
+
+        CraftMine.LOGGER.info("Stored and cleared inventories for {} players", playerInventories.size());
     }
 
     private void restoreInventories(MinecraftServer server) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             UUID playerUUID = player.getUUID();
-            if (playerInventories.containsKey(playerUUID)) {
-                // Clear current inventory
-                player.getInventory().clearContent();
 
-                // Restore saved inventory
+            // Clear current inventory first
+            player.getInventory().clearContent();
+
+            if (playerInventories.containsKey(playerUUID)) {
+                // Restore saved main inventory
                 List<ItemStack> savedInventory = playerInventories.get(playerUUID);
                 for (int i = 0; i < Math.min(savedInventory.size(), player.getInventory().items.size()); i++) {
-                    player.getInventory().items.set(i, savedInventory.get(i));
+                    if (i == 0) {
+                        // Skip the first slot - we'll put the controller there later
+                        continue;
+                    }
+
+                    ItemStack stack = savedInventory.get(i);
+                    if (!stack.isEmpty()) {
+                        player.getInventory().items.set(i, stack.copy());
+                    }
                 }
 
-                // Add game controller to first hotbar slot
-                ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
-                player.getInventory().setItem(0, controllerItem);
-            } else {
-                // If no saved inventory (shouldn't happen), just give game controller
-                ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
-                player.getInventory().setItem(0, controllerItem);
+                // Restore armor and offhand if saved
+                if (playerExtraItems.containsKey(playerUUID)) { // Updated to use the new map
+                    List<ItemStack> extraItems = playerExtraItems.get(playerUUID);
+
+                    // Restore armor
+                    for (int i = 0; i < Math.min(extraItems.size() - 1, player.getInventory().armor.size()); i++) {
+                        ItemStack stack = extraItems.get(i);
+                        if (!stack.isEmpty()) {
+                            player.getInventory().armor.set(i, stack.copy());
+                        }
+                    }
+
+                    // Restore offhand
+                    if (extraItems.size() > player.getInventory().armor.size()) {
+                        ItemStack offhandItem = extraItems.get(extraItems.size() - 1);
+                        if (!offhandItem.isEmpty()) {
+                            player.getInventory().offhand.set(0, offhandItem.copy());
+                        }
+                    }
+                }
             }
+
+            // Always add game controller to first hotbar slot (slot 0)
+            ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
+            player.getInventory().setItem(0, controllerItem);
+
+            // Force inventory update
+            player.inventoryMenu.broadcastChanges();
+            player.sendSystemMessage(
+                    Component.literal("Game ended. Inventory restored. Game Controller placed in first slot.")
+                            .withStyle(ChatFormatting.GREEN));
         }
+
+        CraftMine.LOGGER.info("Restored inventories for all players");
     }
 }

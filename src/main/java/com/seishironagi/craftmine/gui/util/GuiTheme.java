@@ -1,7 +1,6 @@
 package com.seishironagi.craftmine.gui.util;
 
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
 
 /**
  * Helper class for rendering consistent GUI elements across different screens

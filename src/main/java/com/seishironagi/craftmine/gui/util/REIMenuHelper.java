@@ -1,6 +1,5 @@
 package com.seishironagi.craftmine.gui.util;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 import org.slf4j.Logger;

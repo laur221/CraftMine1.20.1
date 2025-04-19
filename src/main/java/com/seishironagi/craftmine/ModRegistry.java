@@ -4,6 +4,8 @@ import com.seishironagi.craftmine.client.AnnouncementOverlay;
 import com.seishironagi.craftmine.client.TargetItemOverlay;
 import com.seishironagi.craftmine.client.TimerHudOverlay;
 import com.seishironagi.craftmine.items.GameControllerItem;
+import com.seishironagi.craftmine.client.RecipeDisplayOverlay;
+import com.seishironagi.craftmine.client.ModKeyBindings;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
@@ -38,12 +40,19 @@ public class ModRegistry {
     public static void registerClient(IEventBus modEventBus) {
         modEventBus.addListener(ModRegistry::registerGuiOverlays);
         modEventBus.addListener(ModRegistry::onClientSetup);
+        modEventBus.addListener(ModRegistry::registerKeyBindings);
     }
 
     private static void registerGuiOverlays(RegisterGuiOverlaysEvent event) {
         event.registerAboveAll("timer", TimerHudOverlay.HUD_TIMER);
         event.registerAboveAll("target_item", TargetItemOverlay.HUD_TARGET_ITEM);
         event.registerAboveAll("announcement", AnnouncementOverlay.HUD_ANNOUNCEMENT);
+        event.registerAboveAll("recipe", RecipeDisplayOverlay.HUD_RECIPE);
+    }
+
+    private static void registerKeyBindings(net.minecraftforge.client.event.RegisterKeyMappingsEvent event) {
+        event.register(ModKeyBindings.SHOW_RECIPE_KEY);
+        LOGGER.info("Registered CraftMine key bindings");
     }
 
     private static void onClientSetup(FMLClientSetupEvent event) {

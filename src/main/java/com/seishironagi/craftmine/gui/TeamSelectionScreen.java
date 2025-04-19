@@ -17,7 +17,7 @@ import java.util.List;
 
 public class TeamSelectionScreen extends Screen {
     // Button dimensions and styling
-    private static final int BUTTON_WIDTH = 140;
+    private static final int BUTTON_WIDTH = 100;
     private static final int BUTTON_HEIGHT = 30;
     private static final int BUTTON_SPACING = 35;
 
@@ -32,7 +32,7 @@ public class TeamSelectionScreen extends Screen {
     private static final int NEUTRAL_COLOR = 0xFF888888;
 
     // Panel dimensions
-    private int imageWidth = 200;
+    private int imageWidth = 280;
     private int imageHeight = 180;
     private int leftPos;
     private int topPos;
@@ -48,19 +48,26 @@ public class TeamSelectionScreen extends Screen {
         this.leftPos = (this.width - this.imageWidth) / 2;
         this.topPos = (this.height - this.imageHeight) / 2;
 
-        int centerX = this.width / 2 - BUTTON_WIDTH / 2;
-        int startY = this.topPos + 50;
-
         // Clear existing buttons
         menuButtons.clear();
 
-        // Add team buttons
-        addAnimatedButton(centerX, startY, "§c§lJoin " + Config.redTeamName, b -> joinTeam("red"), RED_TEAM_COLOR);
-        addAnimatedButton(centerX, startY + BUTTON_HEIGHT + BUTTON_SPACING, "§9§lJoin " + Config.blueTeamName,
+        // Calculate positions for horizontal team buttons
+        int buttonY = this.topPos + 60;
+        int redButtonX = this.width / 2 - BUTTON_WIDTH - 30; // 10px spacing between buttons
+        int blueButtonX = this.width / 2 + 30;
+
+        // Calculate position for back button - centered and below team buttons
+        int backButtonX = this.width / 2 - BUTTON_WIDTH / 2;
+        int backButtonY = buttonY + BUTTON_HEIGHT + 40; // More space between team buttons and back
+
+        // Add team buttons side by side
+        addAnimatedButton(redButtonX, buttonY, "§c§lJoin " + Config.redTeamName,
+                b -> joinTeam("red"), RED_TEAM_COLOR);
+        addAnimatedButton(blueButtonX, buttonY, "§9§lJoin " + Config.blueTeamName,
                 b -> joinTeam("blue"), BLUE_TEAM_COLOR);
 
-        // Back button
-        addAnimatedButton(centerX, startY + (BUTTON_HEIGHT + BUTTON_SPACING) * 2, "§7§lBack", b -> goBackToMenu(),
+        // Back button centered below
+        addAnimatedButton(backButtonX, backButtonY, "§7§lBack", b -> goBackToMenu(),
                 NEUTRAL_COLOR);
 
         // Start animation
@@ -148,14 +155,7 @@ public class TeamSelectionScreen extends Screen {
     private void renderDecorations(GuiGraphics graphics) {
         // Team emblems
         int emblemSize = 16;
-        int emblemY = topPos + 35; // Moved up to avoid overlapping buttons
-
-        // Red team emblem - left side of button
-        graphics.fill(leftPos + 20, emblemY, leftPos + 20 + emblemSize, emblemY + emblemSize, RED_TEAM_COLOR);
-
-        // Blue team emblem - right side of button
-        graphics.fill(leftPos + imageWidth - 20 - emblemSize, emblemY,
-                leftPos + imageWidth - 20, emblemY + emblemSize, BLUE_TEAM_COLOR);
+        int emblemY = topPos + 68; // Moved up to avoid overlapping buttons
 
         // VS text - moved up to avoid overlapping buttons
         graphics.drawCenteredString(font, Component.literal("§e§lVS"),
@@ -182,14 +182,25 @@ public class TeamSelectionScreen extends Screen {
         private final int buttonColor;
         private float animProgress = 0;
         private int baseX;
+        private int baseY;
 
         public AnimatedButton(int x, int y, int width, int height, Component component,
                 OnPress onPress, int index, int color) {
-            super(x - 50, y, width, height, component, onPress, DEFAULT_NARRATION);
+            super(x, y, width, height, component, onPress, DEFAULT_NARRATION);
             this.index = index;
             this.baseX = x;
+            this.baseY = y;
             this.buttonColor = color;
             this.active = false; // Start inactive until animation completes
+
+            // Start buttons off-screen based on their index
+            if (index == 0) { // Red team button comes from left
+                this.setX(x - 100);
+            } else if (index == 1) { // Blue team button comes from right
+                this.setX(x + 100);
+            } else { // Back button comes from bottom
+                this.setY(y + 50);
+            }
         }
 
         @Override
@@ -226,12 +237,18 @@ public class TeamSelectionScreen extends Screen {
         }
 
         public void updateAnimation(float globalAnimTime) {
-            // Stagger button animations
-            float staggeredTime = Math.max(0, globalAnimTime - (index * 0.15f));
+            // Different animation based on button position
+            float staggeredTime = Math.max(0, globalAnimTime - (index * 0.1f));
             this.animProgress = Math.min(1.0f, staggeredTime * 3.0f);
 
-            // Update position based on animation
-            this.setX((int) (baseX - 50 * (1.0f - animProgress)));
+            // Different animation for each button
+            if (index == 0) { // Red team
+                this.setX((int) (baseX - 100 * (1.0f - animProgress)));
+            } else if (index == 1) { // Blue team
+                this.setX((int) (baseX + 100 * (1.0f - animProgress)));
+            } else { // Back button
+                this.setY((int) (baseY + 50 * (1.0f - animProgress)));
+            }
 
             // Enable once animation reaches certain threshold
             this.active = animProgress > 0.7f;
