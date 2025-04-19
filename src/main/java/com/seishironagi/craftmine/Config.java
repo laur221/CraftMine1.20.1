@@ -19,7 +19,6 @@ public class Config {
     // Config values with default values
     public static int defaultGameTime = 10;
     public static boolean useItemSpecificTimes = true;
-    public static String welcomeMessage = "Welcome to CraftMine!";
     public static int redTeamColor = 0xFF0000;
     public static int blueTeamColor = 0x0000FF;
     public static String redTeamName = "Red Team";
@@ -36,7 +35,7 @@ public class Config {
     // ForgeConfigSpec values
     private static ForgeConfigSpec.IntValue defaultGameTimeConfig;
     private static ForgeConfigSpec.BooleanValue useItemSpecificTimesConfig;
-    private static ForgeConfigSpec.ConfigValue<String> welcomeMessageConfig;
+
     private static ForgeConfigSpec.IntValue redTeamColorConfig;
     private static ForgeConfigSpec.IntValue blueTeamColorConfig;
     private static ForgeConfigSpec.ConfigValue<String> redTeamNameConfig;
@@ -60,9 +59,6 @@ public class Config {
                 .comment("Whether to use item-specific times")
                 .define("useItemSpecificTimes", true);
         
-        welcomeMessageConfig = COMMON_BUILDER
-                .comment("Welcome message shown to players")
-                .define("welcomeMessage", "Welcome to CraftMine!");
         
         redTeamColorConfig = COMMON_BUILDER
                 .comment("Color for Red Team (RGB format)")
@@ -137,7 +133,6 @@ public class Config {
         try {
             defaultGameTime = defaultGameTimeConfig.get();
             useItemSpecificTimes = useItemSpecificTimesConfig.get();
-            welcomeMessage = welcomeMessageConfig.get();
             redTeamColor = redTeamColorConfig.get();
             blueTeamColor = blueTeamColorConfig.get();
             redTeamName = redTeamNameConfig.get();

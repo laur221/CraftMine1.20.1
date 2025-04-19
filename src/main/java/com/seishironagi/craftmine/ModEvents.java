@@ -1,7 +1,7 @@
 package com.seishironagi.craftmine;
 
 import com.seishironagi.craftmine.network.ModMessages;
-import com.seishironagi.craftmine.network.packet.GameTimerSyncS2CPacket;
+import com.seishironagi.craftmine.network.packet.GameDataSyncS2CPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -16,6 +16,7 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.server.ServerLifecycleHooks;
 
 import java.util.Random;
 
@@ -31,21 +32,26 @@ public class ModEvents {
         }
 
         if (!event.getLevel().isClientSide() && event.getEntity() instanceof ServerPlayer player) {
-            // Send welcome message
-            player.sendSystemMessage(Component.literal(Config.welcomeMessage)
-                    .withStyle(ChatFormatting.GOLD));
-
             // Give game controller item
             ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
             if (!player.getInventory().contains(controllerItem)) {
                 player.getInventory().add(controllerItem);
             }
 
-            // Sync game state
-            ModMessages.sendToPlayer(new GameTimerSyncS2CPacket(
+            // Sync game state with enhanced data
+            boolean isRedTeam = GameManager.getInstance().getTeamManager().isRedTeam(player);
+            ItemStack targetItem = ItemStack.EMPTY;
+            if (GameManager.getInstance().isGameRunning() && GameManager.getInstance().getTargetItem() != null) {
+                targetItem = new ItemStack(GameManager.getInstance().getTargetItem());
+            }
+
+            ModMessages.sendToPlayer(new GameDataSyncS2CPacket(
                     GameManager.getInstance().getRemainingTimeSeconds(),
-                    GameManager.getInstance().isGameRunning()),
-                    player);
+                    GameManager.getInstance().isGameRunning(),
+                    isRedTeam,
+                    targetItem,
+                    false // This value doesn't matter for initial sync
+            ), player);
         }
     }
 
@@ -59,10 +65,24 @@ public class ModEvents {
                 tickCounter = 0;
 
                 if (GameManager.getInstance().isGameRunning()) {
-                    // Send timer update to all players
-                    ModMessages.sendToAll(new GameTimerSyncS2CPacket(
-                            GameManager.getInstance().getRemainingTimeSeconds(),
-                            true));
+                    // For each player, send customized data based on their team
+                    MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+                    if (server != null) {
+                        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                            boolean isRedTeam = GameManager.getInstance().getTeamManager().isRedTeam(player);
+                            ItemStack targetItem = ItemStack.EMPTY;
+                            if (GameManager.getInstance().getTargetItem() != null) {
+                                targetItem = new ItemStack(GameManager.getInstance().getTargetItem());
+                            }
+
+                            ModMessages.sendToPlayer(new GameDataSyncS2CPacket(
+                                    GameManager.getInstance().getRemainingTimeSeconds(),
+                                    true,
+                                    isRedTeam,
+                                    targetItem,
+                                    false), player);
+                        }
+                    }
                 }
             }
         }
@@ -119,17 +139,21 @@ public class ModEvents {
 
     @SubscribeEvent
     public static void onGameStart(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
-        // This will also teleport players to random locations when they join
         if (event.getEntity().level().isClientSide())
             return;
 
         Player player = event.getEntity();
         ServerPlayer serverPlayer = (ServerPlayer) player;
 
-        // Only teleport if game is not already running
-        if (!GameManager.getInstance().isGameRunning()) {
-            teleportToRandomLocation(serverPlayer);
+        // Give game controller item when a player joins
+        ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
+        if (!player.getInventory().contains(controllerItem)) {
+            player.getInventory().add(controllerItem);
         }
+
+        // Player will only be teleported when game starts, not when joining
+        player.sendSystemMessage(Component.literal("Welcome to CraftMine! Use the Game Controller to begin.")
+                .withStyle(ChatFormatting.GREEN));
     }
 
     private static void teleportToRandomLocation(ServerPlayer player) {

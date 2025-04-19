@@ -44,6 +44,6 @@ public class CraftMine {
         });
         
         // Use a safe default welcome message in case config hasn't loaded yet
-        LOGGER.info(Config.welcomeMessage != null ? Config.welcomeMessage : "Welcome to CraftMine!");
+        // LOGGER.info(Config.welcomeMessage != null ? Config.welcomeMessage : "Welcome to CraftMine!");
     }
 }

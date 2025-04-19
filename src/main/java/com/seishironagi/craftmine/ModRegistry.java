@@ -1,7 +1,9 @@
 package com.seishironagi.craftmine;
 
-import com.seishironagi.craftmine.items.GameControllerItem;
+import com.seishironagi.craftmine.client.AnnouncementOverlay;
+import com.seishironagi.craftmine.client.TargetItemOverlay;
 import com.seishironagi.craftmine.client.TimerHudOverlay;
+import com.seishironagi.craftmine.items.GameControllerItem;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
@@ -16,12 +18,11 @@ import org.slf4j.LoggerFactory;
 
 public class ModRegistry {
     private static final Logger LOGGER = LoggerFactory.getLogger("CraftMine-Registry");
-    
-    public static final DeferredRegister<Item> ITEMS = 
-            DeferredRegister.create(ForgeRegistries.ITEMS, CraftMine.MOD_ID);
-    
-    public static final RegistryObject<Item> GAME_CONTROLLER_ITEM = 
-            ITEMS.register("game_controller", GameControllerItem::new);
+
+    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, CraftMine.MOD_ID);
+
+    public static final RegistryObject<Item> GAME_CONTROLLER_ITEM = ITEMS.register("game_controller",
+            GameControllerItem::new);
 
     public static void register(IEventBus modEventBus) {
         ITEMS.register(modEventBus);
@@ -41,6 +42,8 @@ public class ModRegistry {
 
     private static void registerGuiOverlays(RegisterGuiOverlaysEvent event) {
         event.registerAboveAll("timer", TimerHudOverlay.HUD_TIMER);
+        event.registerAboveAll("target_item", TargetItemOverlay.HUD_TARGET_ITEM);
+        event.registerAboveAll("announcement", AnnouncementOverlay.HUD_ANNOUNCEMENT);
     }
 
     private static void onClientSetup(FMLClientSetupEvent event) {

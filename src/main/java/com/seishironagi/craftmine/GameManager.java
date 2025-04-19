@@ -1,5 +1,7 @@
 package com.seishironagi.craftmine;
 
+import com.seishironagi.craftmine.network.ModMessages;
+import com.seishironagi.craftmine.network.packet.GameDataSyncS2CPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -98,6 +100,9 @@ public class GameManager {
 
         targetItem = availableItems.get(new Random().nextInt(availableItems.size()));
 
+        // Store and clear player inventories
+        storeAndClearInventories(server);
+
         // Calculate game time
         if (Config.useItemSpecificTimes && Config.itemTimes.containsKey(targetItem)) {
             gameTimeMinutes = Config.itemTimes.get(targetItem);
@@ -175,6 +180,26 @@ public class GameManager {
             broadcastMessage(Config.blueTeamWinMessage, ChatFormatting.GOLD);
         }
 
+        // Restore player inventories with game controller in first slot
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server != null) {
+            restoreInventories(server);
+
+            // Send game end notification to all clients
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                boolean isRedTeam = teamManager.isRedTeam(player);
+
+                // Send with empty item and game no longer running
+                ModMessages.sendToPlayer(new GameDataSyncS2CPacket(
+                        0, // time 0
+                        false, // game not running
+                        isRedTeam,
+                        ItemStack.EMPTY, // no target item
+                        redTeamWin // who won
+                ), player);
+            }
+        }
+
         gameRunning = false;
         targetItem = null;
     }
@@ -218,7 +243,15 @@ public class GameManager {
             // Skip items from dimensions that aren't the overworld
             if (itemId.contains("nether") || itemId.contains("end") ||
                     itemId.contains("dragon") || itemId.contains("shulker") ||
-                    itemId.contains("elytra") || itemId.contains("chorus")) {
+                    itemId.contains("elytra") || itemId.contains("chorus") ||
+                    itemId.contains("quartz") || itemId.contains("ancient_debris") ||
+                    itemId.contains("glowstone") || itemId.contains("soul_") ||
+                    itemId.contains("warped_") || itemId.contains("crimson_") ||
+                    itemId.contains("netherite") || itemId.contains("basalt") ||
+                    itemId.contains("blackstone") || itemId.contains("magma") ||
+                    itemId.contains("shroomlight") || itemId.contains("wither") ||
+                    itemId.contains("gilded") || itemId.contains("blaze") ||
+                    itemId.contains("ghast") || itemId.contains("weeping")) {
                 continue;
             }
 
@@ -230,6 +263,8 @@ public class GameManager {
                     itemId.contains("infested") || itemId.contains("command") ||
                     itemId.contains("spawn_egg") || itemId.contains("chipped") ||
                     itemId.contains("damaged") || itemId.contains("reinforced") ||
+                    itemId.contains("sherd") || itemId.contains("pottery") ||
+                    itemId.contains("Wet sponge") || itemId.contains("sponge") ||
                     itemId.contains("petrified") || itemId.contains("bedrock")) {
                 continue;
             }
@@ -284,7 +319,7 @@ public class GameManager {
             // Check if this position is far enough from all other positions
             validPos = true;
             for (BlockPos usedPos : usedPositions) {
-                if (usedPos.distSqr(pos) < 200 * 200) { // Increase to 200 blocks minimum distance between players
+                if (usedPos.distSqr(pos) < 2 * 2) { // Only 2 blocks minimum distance between players
                     validPos = false;
                     break;
                 }
@@ -327,5 +362,48 @@ public class GameManager {
 
         CraftMine.LOGGER.info("Using fallback position at: " + safePos);
         return safePos;
+    }
+
+    // Map to store player inventories
+    private final Map<UUID, List<ItemStack>> playerInventories = new HashMap<>();
+
+    private void storeAndClearInventories(MinecraftServer server) {
+        playerInventories.clear();
+
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            // Store inventory
+            List<ItemStack> inventory = new ArrayList<>();
+            for (ItemStack stack : player.getInventory().items) {
+                inventory.add(stack.copy());
+            }
+            playerInventories.put(player.getUUID(), inventory);
+
+            // Clear inventory
+            player.getInventory().clearContent();
+        }
+    }
+
+    private void restoreInventories(MinecraftServer server) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            UUID playerUUID = player.getUUID();
+            if (playerInventories.containsKey(playerUUID)) {
+                // Clear current inventory
+                player.getInventory().clearContent();
+
+                // Restore saved inventory
+                List<ItemStack> savedInventory = playerInventories.get(playerUUID);
+                for (int i = 0; i < Math.min(savedInventory.size(), player.getInventory().items.size()); i++) {
+                    player.getInventory().items.set(i, savedInventory.get(i));
+                }
+
+                // Add game controller to first hotbar slot
+                ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
+                player.getInventory().setItem(0, controllerItem);
+            } else {
+                // If no saved inventory (shouldn't happen), just give game controller
+                ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
+                player.getInventory().setItem(0, controllerItem);
+            }
+        }
     }
 }
