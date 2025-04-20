@@ -2,7 +2,6 @@ package com.seishironagi.craftmine.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.seishironagi.craftmine.CraftMine;
-import com.seishironagi.craftmine.Config;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
@@ -23,8 +22,6 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraft.world.item.Item;
-import com.seishironagi.craftmine.client.ClientGameData;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
