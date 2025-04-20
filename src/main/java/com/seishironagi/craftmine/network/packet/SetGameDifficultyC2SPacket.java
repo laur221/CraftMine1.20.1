@@ -1,7 +1,8 @@
 package com.seishironagi.craftmine.network.packet;
 
-import com.seishironagi.craftmine.Config;
+import com.seishironagi.craftmine.difficulty.DifficultyManager;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -24,9 +25,10 @@ public class SetGameDifficultyC2SPacket {
     public boolean handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
         context.enqueueWork(() -> {
-            // Update the game difficulty
-            if (difficulty >= 0 && difficulty <= 2) {
-                Config.gameDifficulty = difficulty;
+            ServerPlayer player = context.getSender();
+            if (player != null) {
+                // Update the difficulty level server-side
+                DifficultyManager.getInstance().setDifficulty(difficulty);
             }
         });
         return true;

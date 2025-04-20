@@ -18,12 +18,17 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.server.ServerLifecycleHooks;
 
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = CraftMine.MOD_ID)
 public class ModEvents {
 
     private static int tickCounter = 0;
+    // Track players who have already received the controller item
+    private static final Set<UUID> playersReceivedController = new HashSet<>();
 
     @SubscribeEvent
     public static void onPlayerJoin(EntityJoinLevelEvent event) {
@@ -32,10 +37,14 @@ public class ModEvents {
         }
 
         if (!event.getLevel().isClientSide() && event.getEntity() instanceof ServerPlayer player) {
-            // Give game controller item
-            ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
-            if (!player.getInventory().contains(controllerItem)) {
-                player.getInventory().add(controllerItem);
+            // Give game controller item ONLY if player has never received it before
+            if (!playersReceivedController.contains(player.getUUID())) {
+                ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
+                if (!player.getInventory().contains(controllerItem)) {
+                    player.getInventory().add(controllerItem);
+                    playersReceivedController.add(player.getUUID());
+                    CraftMine.LOGGER.info("Gave controller to new player: {}", player.getName().getString());
+                }
             }
 
             // Sync game state with enhanced data
@@ -138,29 +147,38 @@ public class ModEvents {
     }
 
     @SubscribeEvent
-    public static void onGameStart(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        // Explicitly DO NOT give controller item on respawn
+        // The item should only be restored after a game ends via
+        // GameManager.restoreInventories()
+    }
+
+    @SubscribeEvent
+    public static void onGameStart(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity().level().isClientSide())
             return;
 
         Player player = event.getEntity();
         ServerPlayer serverPlayer = (ServerPlayer) player;
 
-        // Give game controller item when a player joins
-        ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
-        if (!player.getInventory().contains(controllerItem)) {
-            player.getInventory().add(controllerItem);
+        // Give game controller item for first-time logins only
+        if (!playersReceivedController.contains(player.getUUID())) {
+            ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
+            if (!player.getInventory().contains(controllerItem)) {
+                player.getInventory().add(controllerItem);
+                playersReceivedController.add(player.getUUID());
+            }
         }
 
-        // Player will only be teleported when game starts, not when joining
+        // Welcome message
         player.sendSystemMessage(Component.literal("Welcome to CraftMine! Use the Game Controller to begin.")
                 .withStyle(ChatFormatting.GREEN));
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(net.minecraftforge.event.TickEvent.PlayerTickEvent event) {
-        if (event.phase == net.minecraftforge.event.TickEvent.Phase.END || event.player.level().isClientSide()) {
+    public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
+        if (event.phase == TickEvent.Phase.END || event.player.level().isClientSide())
             return;
-        }
 
         // Check if the player is frozen
         if (GameManager.getInstance().isGameRunning() && GameManager.getInstance().isPlayerFrozen(event.player)) {
@@ -185,8 +203,8 @@ public class ModEvents {
         net.minecraft.server.level.ServerLevel level = player.serverLevel();
 
         // Calculate random coordinates with increased distance range
-        int minDistance = 500; // Increase from 100 to 500
-        int maxDistance = 3000; // Increase from 1000 to 3000
+        int minDistance = 500;
+        int maxDistance = 3000;
         int distance = minDistance + random.nextInt(maxDistance - minDistance);
         double angle = random.nextDouble() * Math.PI * 2;
 
@@ -237,5 +255,10 @@ public class ModEvents {
 
         CraftMine.LOGGER.info("Using fallback position at: " + safePos);
         return safePos;
+    }
+
+    // Helper method to mark player as having received controller
+    public static void markPlayerReceivedController(UUID playerId) {
+        playersReceivedController.add(playerId);
     }
 }

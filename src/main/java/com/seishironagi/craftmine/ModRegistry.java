@@ -19,7 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ModRegistry {
-    private static final Logger LOGGER = LoggerFactory.getLogger("CraftMine-Registry");
+    private static final Logger LOGGER = LoggerFactory.getLogger("CraftMine-Registrys");
 
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, CraftMine.MOD_ID);
 

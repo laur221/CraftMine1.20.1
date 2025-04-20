@@ -68,6 +68,62 @@ public class Config {
     private static ForgeConfigSpec.IntValue hardTimeConfig;
     private static ForgeConfigSpec.IntValue gameDifficultyConfig;
 
+    // Define sets of item IDs for dynamic estimation based on actual gameplay difficulty
+    private static final Set<String> EASY_ITEMS = Set.of(
+            // Basic resources - very quick to obtain
+            "minecraft:dirt", "minecraft:cobblestone", "minecraft:oak_planks", "minecraft:stick",
+            "minecraft:sand", "minecraft:gravel", "minecraft:oak_log", "minecraft:birch_log",
+            // Basic items - quick gathering
+            "minecraft:flint", "minecraft:feather", "minecraft:string", "minecraft:leather",
+            "minecraft:bone", "minecraft:gunpowder", "minecraft:spider_eye", "minecraft:rotten_flesh",
+            // Basic food - early game
+            "minecraft:bread", "minecraft:apple", "minecraft:carrot", "minecraft:potato",
+            "minecraft:beetroot", "minecraft:melon_slice", "minecraft:pumpkin", "minecraft:egg",
+            // Basic crafted items
+            "minecraft:wooden_pickaxe", "minecraft:wooden_sword", "minecraft:wooden_axe",
+            "minecraft:crafting_table", "minecraft:furnace", "minecraft:torch",
+            // Dyes and flowers (moved from harder categories)
+            "minecraft:white_dye", "minecraft:orange_dye", "minecraft:magenta_dye",
+            "minecraft:light_blue_dye", "minecraft:yellow_dye", "minecraft:lime_dye",
+            "minecraft:pink_dye", "minecraft:gray_dye", "minecraft:light_gray_dye",
+            "minecraft:cyan_dye", "minecraft:purple_dye", "minecraft:blue_dye",
+            "minecraft:brown_dye", "minecraft:green_dye", "minecraft:red_dye", "minecraft:black_dye",
+            "minecraft:dandelion", "minecraft:poppy", "minecraft:blue_orchid", "minecraft:oxeye_daisy"
+    );
+
+    private static final Set<String> MEDIUM_ITEMS = Set.of(
+            // Mid-tier resources - require mining
+            "minecraft:iron_ingot", "minecraft:gold_ingot", "minecraft:coal",
+            "minecraft:lapis_lazuli", "minecraft:redstone", "minecraft:copper_ingot",
+            // Mid-tier equipment
+            "minecraft:iron_pickaxe", "minecraft:iron_sword", "minecraft:iron_axe",
+            "minecraft:iron_shovel", "minecraft:iron_helmet", "minecraft:iron_chestplate",
+            "minecraft:iron_leggings", "minecraft:iron_boots", "minecraft:shield",
+            // Mid-tier weapons
+            "minecraft:bow", "minecraft:crossbow", "minecraft:arrow", "minecraft:spectral_arrow",
+            // Mid-tier crafted items
+            "minecraft:fishing_rod", "minecraft:compass", "minecraft:clock", 
+            "minecraft:shears", "minecraft:bucket", "minecraft:cauldron",
+            // Mid-tier food and farming
+            "minecraft:golden_carrot", "minecraft:cooked_beef", "minecraft:cooked_porkchop",
+            "minecraft:cake", "minecraft:pumpkin_pie", "minecraft:mushroom_stew"
+    );
+
+    private static final Set<String> HARD_ITEMS = Set.of(
+            // Diamond tier
+            "minecraft:diamond", "minecraft:diamond_pickaxe", "minecraft:diamond_sword",
+            "minecraft:diamond_axe", "minecraft:diamond_shovel", "minecraft:diamond_helmet",
+            "minecraft:diamond_chestplate", "minecraft:diamond_leggings", "minecraft:diamond_boots",
+            // Special overworld items
+            "minecraft:enchanting_table", "minecraft:anvil", "minecraft:jukebox",
+            "minecraft:lodestone", "minecraft:beehive", "minecraft:composter",
+            // Advanced redstone
+            "minecraft:dispenser", "minecraft:dropper", "minecraft:observer",
+            "minecraft:repeater", "minecraft:comparator", "minecraft:daylight_detector",
+            // Special overworld resources
+            "minecraft:emerald", "minecraft:obsidian", "minecraft:golden_block"
+    );
+
     static {
         COMMON_BUILDER.comment("Game Settings");
 
@@ -100,12 +156,12 @@ public class Config {
                 .define("gameStartMessage", "The game has started!");
 
         redTeamTaskMessageConfig = COMMON_BUILDER
-                .comment("Task message for Red Team (use %s for item name and time)")
+                .comment("Task message for Red Team (use %s for item name and %d for seconds)")
                 .define("redTeamTaskMessage", "Find %s within %d minutes!");
 
         blueTeamTaskMessageConfig = COMMON_BUILDER
-                .comment("Task message for Blue Team")
-                .define("blueTeamTaskMessage", "Prevent the Red Team from finding their target!");
+                .comment("Task message for Blue Team (use %d for minutes)")
+                .define("blueTeamTaskMessage", "Prevent the Red Team for %d minutes!");
 
         redTeamWinMessageConfig = COMMON_BUILDER
                 .comment("Message when Red Team wins")
@@ -238,5 +294,46 @@ public class Config {
 
     public static void cycleDifficulty() {
         gameDifficulty = (gameDifficulty + 1) % 3;
+    }
+
+    public static int getEstimatedTimeForItemDynamic(Item item) {
+        String id = ForgeRegistries.ITEMS.getKey(item).toString();
+        Random rnd = new Random(id.hashCode()); // deterministic per item
+
+        // Base times for each difficulty (in seconds)
+        int baseTime;
+        int variationRange;
+
+        if (EASY_ITEMS.contains(id)) {
+            // Easy items: 3-7 minutes
+            baseTime = 180; // 3 minutes base
+            variationRange = 240; // up to 4 additional minutes
+        } else if (MEDIUM_ITEMS.contains(id)) {
+            // Medium items: 8-15 minutes
+            baseTime = 480; // 8 minutes base
+            variationRange = 420; // up to 7 additional minutes
+        } else if (HARD_ITEMS.contains(id)) {
+            // Hard items: 15-30 minutes
+            baseTime = 900; // 15 minutes base
+            variationRange = 900; // up to 15 additional minutes
+        } else {
+            // Unknown items: 10-20 minutes
+            baseTime = 600; // 10 minutes base
+            variationRange = 600; // up to 10 additional minutes
+        }
+
+        // Adjust based on game difficulty
+        switch (gameDifficulty) {
+            case DIFFICULTY_EASY -> {
+                baseTime = (int) (baseTime * 1.5); // 50% more time on easy
+                variationRange = (int) (variationRange * 1.2);
+            }
+            case DIFFICULTY_HARD -> {
+                baseTime = (int) (baseTime * 0.7); // 30% less time on hard
+                variationRange = (int) (variationRange * 0.8);
+            }
+        }
+
+        return baseTime + rnd.nextInt(variationRange);
     }
 }

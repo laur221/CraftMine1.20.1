@@ -1,41 +1,43 @@
 package com.seishironagi.craftmine.gui;
 
 import com.seishironagi.craftmine.Config;
+import com.seishironagi.craftmine.difficulty.DifficultyManager;
 import com.seishironagi.craftmine.gui.util.GuiTheme;
 import com.seishironagi.craftmine.network.ModMessages;
 import com.seishironagi.craftmine.network.packet.SetGameDifficultyC2SPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 
-@OnlyIn(Dist.CLIENT)
 public class GameSettingsScreen extends Screen {
     // Panel dimensions
-    private int imageWidth = 220;
-    private int imageHeight = 180;
+    private int imageWidth = 260;
+    private int imageHeight = 200;
     private int leftPos;
     private int topPos;
 
     // Button dimensions
-    private static final int BUTTON_WIDTH = 160;
+    private static final int BUTTON_WIDTH = 140;
     private static final int BUTTON_HEIGHT = 25;
+    private static final int BUTTON_SPACING = 10;
 
     // Animation
     private final List<GameControllerScreen.AnimatedButton> buttons = new ArrayList<>();
     private float animationTime = 0;
     private boolean animatingIn = true;
 
-    // Settings values
-    private int currentDifficulty = Config.gameDifficulty;
+    // Difficulty selection button
+    private Button difficultyButton;
+    private static final String[] DIFFICULTY_NAMES = { "Easy", "Medium", "Hard" };
+    private static final int[] DIFFICULTY_COLORS = { 0xFF55AA55, 0xFFAAAA55, 0xFFAA5555 };
 
     public GameSettingsScreen() {
         super(Component.literal("§a§lGame Settings"));
@@ -44,52 +46,61 @@ public class GameSettingsScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+
         this.leftPos = (this.width - this.imageWidth) / 2;
         this.topPos = (this.height - this.imageHeight) / 2;
 
-        // Clear existing buttons
+        // Add buttons for settings
+        int centerX = this.width / 2 - BUTTON_WIDTH / 2;
+        int startY = this.topPos + 45;
+
+        // Clear button list
         buttons.clear();
 
-        // Add difficulty button
-        String difficultyText = "§eDifficulty: §f" + Config.getDifficultyName();
-        addAnimatedButton(this.leftPos + 30, this.topPos + 50, difficultyText, button -> cycleDifficulty(), 0xFFAA33);
+        // Add difficulty selection button
+        int difficultyIndex = DifficultyManager.getInstance().getCurrentDifficulty();
+        String difficultyText = "§l§eDifficulty: §f" + DIFFICULTY_NAMES[difficultyIndex];
+        difficultyButton = addAnimatedButton(centerX, startY, difficultyText,
+                b -> cycleDifficulty(), DIFFICULTY_COLORS[difficultyIndex]);
 
-        // Add explanation text as a disabled button
-        addAnimatedButton(this.leftPos + 30, this.topPos + 80,
-                "§7Time is based on default settings", button -> {
-                }, 0x888888);
+        // Add game time setting button
+        addAnimatedButton(centerX, startY + BUTTON_HEIGHT + BUTTON_SPACING,
+                "§l§bTime per Item: §fVariable",
+                b -> {
+                    /* Toggle time variation */},
+                0xFF55AAAA);
 
-        // Add current difficulty info as a disabled button
-        addAnimatedButton(this.leftPos + 30, this.topPos + 110,
-                "§7Current difficulty: §e" + Config.getDifficultyName(), button -> {
-                }, 0x888888);
+        // Back button at the bottom
+        addAnimatedButton(centerX, startY + (BUTTON_HEIGHT + BUTTON_SPACING) * 4,
+                "§l§7Back", b -> goBackToMenu(), 0xFF888888);
 
-        // Add back button
-        addAnimatedButton(this.leftPos + 30, this.topPos + 140, "§7§lBack", button -> goBackToMenu(), 0x555555);
+        // Start animation
+        animationTime = 0;
+        animatingIn = true;
     }
 
-    private void addAnimatedButton(int x, int y, String text,
-            net.minecraft.client.gui.components.Button.OnPress handler, int color) {
+    private GameControllerScreen.AnimatedButton addAnimatedButton(int x, int y, String text, Button.OnPress handler,
+            int color) {
         GameControllerScreen.AnimatedButton button = new GameControllerScreen.AnimatedButton(
                 x, y, BUTTON_WIDTH, BUTTON_HEIGHT,
                 Component.literal(text), handler, buttons.size(), color);
         buttons.add(button);
         this.addRenderableWidget(button);
+        return button;
     }
 
     private void cycleDifficulty() {
-        // Play click sound
         playClickSound();
 
-        // Update difficulty
-        Config.cycleDifficulty();
-        currentDifficulty = Config.gameDifficulty;
+        // Cycle difficulty
+        int newDifficulty = DifficultyManager.getInstance().cycleDifficulty();
 
-        // Send to server
-        ModMessages.sendToServer(new SetGameDifficultyC2SPacket(currentDifficulty));
+        // Update button text and color
+        String difficultyText = "§l§eDifficulty: §f" + DIFFICULTY_NAMES[newDifficulty];
+        difficultyButton.setMessage(Component.literal(difficultyText));
 
-        // Recreate the screen with updated values
-        Minecraft.getInstance().setScreen(new GameSettingsScreen());
+        // Send packet to server to update difficulty
+        ModMessages.sendToServer(new SetGameDifficultyC2SPacket(newDifficulty));
     }
 
     private void goBackToMenu() {
@@ -127,49 +138,36 @@ public class GameSettingsScreen extends Screen {
         // Draw panel
         GuiTheme.renderPanel(
                 graphics, leftPos, topPos, imageWidth, imageHeight,
-                0x90054520, 0x90106530);
+                0x90203040, 0x90304050);
 
-        // Draw the title
-        graphics.drawCenteredString(font, this.title, this.width / 2, topPos + 15, 0xFFFFAA);
+        // Draw title
+        graphics.drawCenteredString(font, this.title, this.width / 2, topPos + 15, 0xAAFFAA);
 
-        // Draw subtitle
-        graphics.drawCenteredString(font, Component.literal("§7Configure game settings"),
-                this.width / 2, topPos + 30, 0xBBBBBB);
+        // Draw settings description
+        renderSettingsInfo(graphics);
 
-        // Render widgets
+        // Render the buttons
         super.render(graphics, mouseX, mouseY, partialTick);
-
-        // Draw explanatory text
-        drawExplanationBox(graphics, mouseX, mouseY);
     }
 
-    private void drawExplanationBox(GuiGraphics graphics, int mouseX, int mouseY) {
-        String explanation = getDifficultyDescription();
-        graphics.drawCenteredString(font, Component.literal(explanation),
-                this.width / 2, this.topPos + this.imageHeight - 25, getDifficultyColor());
-    }
+    private void renderSettingsInfo(GuiGraphics graphics) {
+        int textX = leftPos + 20;
+        int textY = topPos + imageHeight - 70;
+        int lineHeight = 12;
 
-    private String getDifficultyDescription() {
-        switch (currentDifficulty) {
-            case Config.DIFFICULTY_EASY:
-                return "§aEasy: §fShorter game times";
-            case Config.DIFFICULTY_HARD:
-                return "§cHard: §fLonger game times";
-            case Config.DIFFICULTY_MEDIUM:
-            default:
-                return "§6Medium: §fBalanced game times";
-        }
-    }
+        DifficultyManager difficultyManager = DifficultyManager.getInstance();
 
-    private int getDifficultyColor() {
-        switch (currentDifficulty) {
-            case Config.DIFFICULTY_EASY:
-                return 0xFF55FF55;
-            case Config.DIFFICULTY_HARD:
-                return 0xFFFF5555;
-            case Config.DIFFICULTY_MEDIUM:
-            default:
-                return 0xFFFFAA00;
+        // Draw difficulty description
+        String[] difficultyInfo = {
+                "§e§lCurrent Difficulty: §f" + difficultyManager.getDifficultyName(),
+                "§7Easy: Simple items, 2-3 minutes",
+                "§7Medium: Moderate items, 4-5 minutes",
+                "§7Hard: Complex items, 6-8 minutes"
+        };
+
+        for (String line : difficultyInfo) {
+            graphics.drawString(font, Component.literal(line), textX, textY, 0xFFFFFF);
+            textY += lineHeight;
         }
     }
 

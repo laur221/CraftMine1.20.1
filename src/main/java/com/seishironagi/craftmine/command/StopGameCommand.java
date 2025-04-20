@@ -14,10 +14,9 @@ public class StopGameCommand {
                         .requires(source -> source.hasPermission(2)) // Require permission level 2 (op)
                         .executes(context -> {
                             CommandSourceStack source = context.getSource();
-
                             if (GameManager.getInstance().isGameRunning()) {
-                                // Force stop the game
-                                GameManager.getInstance().endGame(false);
+                                // Force stop the game without declaring a winner
+                                GameManager.getInstance().stopGame();
                                 source.sendSuccess(() -> Component.literal("Game forcefully stopped."), true);
                             } else {
                                 source.sendFailure(Component.literal("No game is currently running."));

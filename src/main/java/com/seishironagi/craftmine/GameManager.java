@@ -15,6 +15,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.server.ServerLifecycleHooks;
+import com.seishironagi.craftmine.difficulty.DifficultyManager;
 
 import java.util.*;
 
@@ -24,6 +25,7 @@ public class GameManager {
     private final TeamManager teamManager;
     private Item targetItem;
     private int gameTimeMinutes = Config.defaultGameTime;
+    private int gameTimeSeconds; // store time in seconds per item
     private long gameEndTimeMillis;
     private boolean gameRunning = false;
     private final Timer gameTimer = new Timer("GameTimer");
@@ -67,9 +69,10 @@ public class GameManager {
         if (!gameRunning)
             return 0;
 
-        if (!timerStarted)
-            return gameTimeMinutes * 60 * 1000L;
-
+        if (!timerStarted) {
+            // timer not started: full time duration
+            return gameTimeSeconds * 1000L;
+        }
         return Math.max(0, gameEndTimeMillis - System.currentTimeMillis());
     }
 
@@ -94,32 +97,20 @@ public class GameManager {
             return;
         }
 
-        // Always use default time, ignore difficulty
-        gameTimeMinutes = Config.defaultGameTime;
-        timerStarted = false;
-
         // Ensure it's daytime and clear weather in the Overworld
         ServerLevel overworld = server.overworld();
         overworld.setDayTime(1000); // dawn
         // clear rain and thunder immediately
         overworld.setWeatherParameters(0, 0, false, false);
 
-        // Select random item from overworld items
-        List<Item> availableItems = getAllOverworldItems();
-        if (availableItems.isEmpty()) {
-            // Fallback to configured items if no overworld items found
-            availableItems = new ArrayList<>(Config.gameItems);
-        }
+        // Use the DifficultyManager to select an item based on current difficulty
+        DifficultyManager difficultyManager = DifficultyManager.getInstance();
+        targetItem = difficultyManager.selectRandomItem();
 
-        if (availableItems.isEmpty()) {
-            broadcastMessage("Cannot start game: No items configured.", ChatFormatting.RED);
-            return;
-        }
-
-        targetItem = availableItems.get(new Random().nextInt(availableItems.size()));
-
-        // Set game time per item weight
-        gameTimeMinutes = Config.getTimeForItem(targetItem);
+        // Get time allocation in seconds based on difficulty
+        gameTimeSeconds = difficultyManager.getTimeAllocation();
+        // Convert to minutes for display (rounded up)
+        gameTimeMinutes = (int) Math.ceil(gameTimeSeconds / 60.0);
 
         timerStarted = false;
 
@@ -132,8 +123,11 @@ public class GameManager {
         // Starting message
         broadcastMessage("Starting new game! Please wait...", ChatFormatting.GOLD);
 
-        // First, send target item message to red team
+        // First, send target item message with difficulty info to red team
         String itemName = targetItem.getDescription().getString();
+        String difficultyInfo = difficultyManager.getSettingsDescription(targetItem, gameTimeSeconds);
+        redPlayer.sendSystemMessage(Component.literal(difficultyInfo).withStyle(ChatFormatting.GOLD));
+
         String redMessage = String.format(Config.redTeamTaskMessage, itemName, gameTimeMinutes);
         redPlayer.sendSystemMessage(Component.literal(redMessage).withStyle(ChatFormatting.GOLD));
 
@@ -184,8 +178,8 @@ public class GameManager {
         // Check if timer needs to be started
         if (!timerStarted && System.currentTimeMillis() >= timerStartDelayMillis) {
             timerStarted = true;
-            // Only now set the end time, after the freeze delay has passed
-            gameEndTimeMillis = System.currentTimeMillis() + (gameTimeMinutes * 60 * 1000L);
+            // now start countdown based on seconds
+            gameEndTimeMillis = System.currentTimeMillis() + (gameTimeSeconds * 1000L);
             broadcastMessage("Timer has started! The game is now in progress.", ChatFormatting.GOLD);
         }
     }
@@ -264,6 +258,49 @@ public class GameManager {
                         isRedTeam,
                         ItemStack.EMPTY, // no target item
                         redTeamWin // who won
+                ), player);
+            }
+        }
+
+        // Reset game state
+        gameRunning = false;
+        targetItem = null;
+        timerStarted = false;
+        frozenPlayers.clear();
+    }
+
+    /**
+     * Stops the game without declaring a winner (for administrative stops)
+     */
+    public void stopGame() {
+        if (!gameRunning)
+            return;
+
+        if (displayTask != null) {
+            displayTask.cancel();
+            displayTask = null;
+        }
+
+        // Special message for administrative stop
+        broadcastMessage("Game has been stopped by an administrator", ChatFormatting.GOLD);
+
+        // Restore player inventories with game controller in first slot
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server != null) {
+            restoreInventories(server);
+
+            // Send game end notification to all clients, without declaring a winner
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                boolean isRedTeam = teamManager.isRedTeam(player);
+
+                // Send with empty item, game not running, and no winner (using false but client
+                // should ignore this)
+                ModMessages.sendToPlayer(new GameDataSyncS2CPacket(
+                        0, // time 0
+                        false, // game not running
+                        isRedTeam,
+                        ItemStack.EMPTY, // no target item
+                        false // who won - ignored by client since game is not running
                 ), player);
             }
         }
@@ -558,6 +595,9 @@ public class GameManager {
             // Add game controller to first hotbar slot (slot 0)
             ItemStack controllerItem = new ItemStack(ModRegistry.GAME_CONTROLLER_ITEM.get());
             player.getInventory().setItem(0, controllerItem);
+
+            // Reset the tracking in ModEvents so we know this player got the controller
+            ModEvents.markPlayerReceivedController(player.getUUID());
 
             // Force inventory update
             player.inventoryMenu.broadcastChanges();
