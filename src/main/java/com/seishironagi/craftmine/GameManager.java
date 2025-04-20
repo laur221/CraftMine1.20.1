@@ -419,9 +419,7 @@ public class GameManager {
                     // Additional excluded items
                     itemId.contains("skulk") || itemId.contains("oxidized") ||
                     itemId.contains("exposed") || itemId.contains("weathered") ||
-                    itemId.contains("copper_block") || itemId.contains("amethyst") ||
-                    itemId.contains("budding") || itemId.contains("calcite") ||
-                    itemId.contains("tuff") || itemId.contains("suspicious") ||
+                    itemId.contains("budding") || itemId.contains("suspicious") ||
                     itemId.contains("decorated") ||
                     // New excluded items
                     itemId.contains("lead") || itemId.contains("beacon") ||
@@ -442,7 +440,8 @@ public class GameManager {
                     itemId.contains("bookshelf") || // Bookshelves
                     itemId.contains("campfire") || // Campfires
                     itemId.contains("beehive") || // Beehives
-                    itemId.contains("redstone_lamp") // Redstone lamps
+                    itemId.contains("redstone_lamp") || // Redstone lamps
+                    itemId.contains("blaze_rod") // Blaze rods
                     
                     
         ) { 

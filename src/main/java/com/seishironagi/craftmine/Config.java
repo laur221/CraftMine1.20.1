@@ -289,41 +289,39 @@ public class Config {
 
     public static int getEstimatedTimeForItemDynamic(Item item) {
         String id = ForgeRegistries.ITEMS.getKey(item).toString();
-        Random rnd = new Random(id.hashCode()); // deterministic per item
+        Random rnd = new Random(id.hashCode());
 
-        // Base times for each difficulty (in seconds)
         int baseTime;
         int variationRange;
 
-        // Remove specific handling for items we've excluded
+        // Classify by predefined sets
         if (EASY_ITEMS.contains(id)) {
-            // Easy items: 3-7 minutes
-            baseTime = 180; // 3 minutes base
-            variationRange = 240; // up to 4 additional minutes
+            baseTime = 180; // 3 minutes
+            variationRange = 240; // + up to 4 minutes
         } else if (MEDIUM_ITEMS.contains(id)) {
-            // Medium items: 8-15 minutes
-            baseTime = 480; // 8 minutes base
-            variationRange = 420; // up to 7 additional minutes
+            baseTime = 480; // 8 minutes
+            variationRange = 420; // + up to 7 minutes
         } else if (HARD_ITEMS.contains(id)) {
-            // Hard items: 15-35 minutes
-            baseTime = 900; // 15 minutes base
-            variationRange = 1200; // up to 20 additional minutes
+            baseTime = 900; // 15 minutes
+            variationRange = 1200; // + up to 20 minutes
         } else {
-            // Unknown items: 10-20 minutes
-            baseTime = 600; // 10 minutes base
-            variationRange = 600; // up to 10 additional minutes
+            baseTime = 600; // 10 minutes default
+            variationRange = 600; // + up to 10 minutes
         }
 
-        // Adjust based on game difficulty
+        // Adjust based on configured difficulty
         switch (gameDifficulty) {
-            case DIFFICULTY_EASY -> {
-                baseTime = (int) (baseTime * 1.5); // 50% more time on easy
+            case DIFFICULTY_EASY:
+                baseTime = (int) (baseTime * 1.5);
                 variationRange = (int) (variationRange * 1.2);
-            }
-            case DIFFICULTY_HARD -> {
-                baseTime = (int) (baseTime * 0.7); // 30% less time on hard
+                break;
+            case DIFFICULTY_HARD:
+                baseTime = (int) (baseTime * 0.7);
                 variationRange = (int) (variationRange * 0.8);
-            }
+                break;
+            default:
+                // Medium uses unmodified values
+                break;
         }
 
         return baseTime + rnd.nextInt(variationRange);

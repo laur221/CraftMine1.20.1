@@ -11,6 +11,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
+import com.seishironagi.craftmine.client.ClientGameData;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
@@ -91,19 +92,18 @@ public class GameSettingsScreen extends Screen {
     private void cycleDifficulty() {
         playClickSound();
 
-        // Cycle difficulty
+        // Cycle difficulty client‑side and server‑side
         int newDifficulty = DifficultyManager.getInstance().cycleDifficulty();
+        ClientGameData.setGameDifficulty(newDifficulty); // immediately update client state
 
         // Update button text and color
         String difficultyText = "§l§eDifficulty: §f" + DIFFICULTY_NAMES[newDifficulty];
         difficultyButton.setMessage(Component.literal(difficultyText));
 
-        // Update the button color immediately
         if (difficultyButton instanceof GameControllerScreen.AnimatedButton animButton) {
             animButton.setButtonColor(DIFFICULTY_COLORS[newDifficulty]);
         }
 
-        // Send packet to server to update difficulty
         ModMessages.sendToServer(new SetGameDifficultyC2SPacket(newDifficulty));
     }
 

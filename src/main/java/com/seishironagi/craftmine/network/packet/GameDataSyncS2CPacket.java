@@ -55,19 +55,17 @@ public class GameDataSyncS2CPacket {
     public boolean handle(Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
         context.enqueueWork(() -> {
-            // Update client-side game data
-            ClientGameData.setRemainingSeconds(remainingSeconds);
+            // Always update running state and timer
             ClientGameData.setGameRunning(gameRunning);
+            ClientGameData.setRemainingSeconds(remainingSeconds);
             ClientGameData.setRedTeam(isRedTeam);
             ClientGameData.setTargetItem(targetItem);
 
-            if (!gameRunning) {
-                ClientGameData.setGameResult(redTeamWon);
+            // Only override client‐side difficulty/time if a game is active
+            if (gameRunning) {
+                ClientGameData.setGameDifficulty(gameDifficulty);
+                ClientGameData.setItemTimeMinutes(itemTimeMinutes);
             }
-
-            // Update difficulty data
-            ClientGameData.setGameDifficulty(gameDifficulty);
-            ClientGameData.setItemTimeMinutes(itemTimeMinutes);
         });
         return true;
     }

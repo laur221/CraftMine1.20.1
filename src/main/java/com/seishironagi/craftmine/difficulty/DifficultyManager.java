@@ -49,27 +49,29 @@ public class DifficultyManager {
      * Initialize the item pools with appropriate items for each difficulty
      */
     private void initializeItemPools() {
-        // Easy items - common, simple to obtain
+        // Easy items - very basic and common
         easyItemPool.addAll(Arrays.asList(
                 Items.DIRT, Items.COBBLESTONE, Items.OAK_LOG, Items.BIRCH_LOG,
                 Items.STICK, Items.CRAFTING_TABLE, Items.WOODEN_PICKAXE,
                 Items.WOODEN_AXE, Items.TORCH, Items.APPLE, Items.COAL,
                 Items.WHEAT_SEEDS, Items.SAND, Items.GRAVEL, Items.STONE_BUTTON,
-                Items.WOODEN_SHOVEL, Items.WOODEN_HOE, Items.BOWL));
+                Items.WOODEN_SHOVEL, Items.WOODEN_HOE, Items.BOWL,
+                Items.STONE_PICKAXE, Items.STONE_AXE, Items.FURNACE,
+                Items.STONE_PRESSURE_PLATE));
 
         // Medium items - moderately difficult to obtain
         mediumItemPool.addAll(Arrays.asList(
-                Items.STONE_PICKAXE, Items.FURNACE, Items.IRON_INGOT,
-                Items.BREAD, Items.BUCKET, Items.FISHING_ROD, Items.LEATHER,
-                Items.BOW, Items.ARROW, Items.IRON_SWORD, Items.SHIELD,
-                Items.STONE_AXE, Items.LEAD, Items.SHEARS, Items.IRON_NUGGET,
-                Items.COOKED_BEEF, Items.COOKED_CHICKEN, Items.COOKED_PORKCHOP));
+                Items.REPEATER, Items.PISTON, Items.HOPPER,
+                Items.IRON_INGOT, Items.BREAD, Items.BUCKET,
+                Items.FISHING_ROD, Items.LEATHER, Items.BOW, Items.ARROW,
+                Items.IRON_SWORD, Items.SHIELD, Items.LEAD, Items.SHEARS,
+                Items.IRON_NUGGET, Items.COOKED_BEEF, Items.COOKED_CHICKEN,
+                Items.COOKED_PORKCHOP));
 
         // Hard items - rare or complex crafting
         hardItemPool.addAll(Arrays.asList(
                 Items.DIAMOND, Items.ANVIL, Items.ENCHANTING_TABLE,
                 Items.CLOCK, Items.COMPASS, Items.GOLDEN_APPLE,
-                Items.BREWING_STAND, Items.ENDER_PEARL, Items.BLAZE_ROD,
                 Items.DIAMOND_PICKAXE, Items.IRON_CHESTPLATE, Items.IRON_BOOTS,
                 Items.REDSTONE_LAMP, Items.LAPIS_LAZULI, Items.CAKE,
                 Items.PUMPKIN_PIE, Items.CROSSBOW, Items.BEEHIVE));

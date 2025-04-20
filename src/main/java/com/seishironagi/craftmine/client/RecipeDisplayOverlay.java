@@ -2,6 +2,7 @@ package com.seishironagi.craftmine.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.seishironagi.craftmine.CraftMine;
+import com.seishironagi.craftmine.Config;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
@@ -22,7 +23,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraft.world.item.Item;
-import net.minecraft.ChatFormatting;
+import com.seishironagi.craftmine.client.ClientGameData;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -38,7 +39,7 @@ public class RecipeDisplayOverlay {
 
     private static boolean showRecipe = false;
     private static long hideTime = 0;
-    private static final int DISPLAY_DURATION = 5000; // 5 seconds
+    private static final int DISPLAY_DURATION = 2000000; // 20 seconds
 
     // Mob drop data - mapping common items to mobs that drop them
     private static final Map<String, List<String>> MOB_DROPS = new HashMap<>();
@@ -50,7 +51,6 @@ public class RecipeDisplayOverlay {
         addMobDrop("minecraft:rotten_flesh", "Zombie", "Drowned", "Husk", "Zombie Villager");
         addMobDrop("minecraft:ender_pearl", "Enderman", "Endermite");
         addMobDrop("minecraft:gunpowder", "Creeper", "Ghast", "Witch");
-        addMobDrop("minecraft:blaze_rod", "Blaze");
         addMobDrop("minecraft:leather", "Cow", "Horse", "Llama", "Donkey", "Mule");
         addMobDrop("minecraft:feather", "Chicken");
         addMobDrop("minecraft:egg", "Chicken");
@@ -191,28 +191,9 @@ public class RecipeDisplayOverlay {
         graphics.drawCenteredString(Minecraft.getInstance().font,
                 "Crafting Recipe", x + recipeWidth / 2, y + 5, 0xFFFFFF);
 
-        // Draw difficulty info
-        String difficulty = "Difficulty: " + ClientGameData.getDifficultyName();
-        String timeEstimate = "Time: " + ClientGameData.getItemTimeMinutes() + " minutes";
-
-        int difficultyColor;
-        switch (ClientGameData.getGameDifficulty()) {
-            case ClientGameData.DIFFICULTY_EASY:
-                difficultyColor = 0x55FF55; // Green
-                break;
-            case ClientGameData.DIFFICULTY_HARD:
-                difficultyColor = 0xFF5555; // Red
-                break;
-            default:
-                difficultyColor = 0xFFAA00; // Orange/Yellow
-        }
-
-        graphics.drawString(Minecraft.getInstance().font, difficulty, x + 10, y + 20, difficultyColor);
-        graphics.drawString(Minecraft.getInstance().font, timeEstimate, x + 100, y + 20, 0xFFFFFF);
-
         // Draw grid ingredients
         int gridX = x + 30;
-        int gridY = y + 40;
+        int gridY = y + 17;
         int slotSize = 18;
 
         // Get the ingredients
@@ -242,16 +223,10 @@ public class RecipeDisplayOverlay {
         }
 
         // Draw result
-        int resultX = x + 130;
-        int resultY = y + 60;
+        int resultX = x + 124;
+        int resultY = y + 35;
         graphics.renderItem(resultItem, resultX, resultY);
         graphics.renderItemDecorations(Minecraft.getInstance().font, resultItem, resultX, resultY, null);
-
-        // Draw arrow
-        int arrowX = x + 100;
-        int arrowY = y + 60;
-        graphics.fill(arrowX, arrowY + 3, arrowX + 20, arrowY + 5, 0xFFFFFFFF);
-        graphics.fill(arrowX + 15, arrowY, arrowX + 20, arrowY + 8, 0xFFFFFFFF);
     }
 
     private static <T extends Recipe<?>> void renderFurnaceRecipe(GuiGraphics graphics, T recipe, ItemStack resultItem,
@@ -269,26 +244,7 @@ public class RecipeDisplayOverlay {
 
         // Title
         graphics.drawCenteredString(Minecraft.getInstance().font,
-                furnaceType + " Recipe", x + recipeWidth / 2, y + 10, 0xFFFFFF);
-
-        // After title, add difficulty indicator
-        String difficulty = "Difficulty: " + ClientGameData.getDifficultyName();
-        String timeEstimate = "Time: " + ClientGameData.getItemTimeMinutes() + " minutes";
-
-        int difficultyColor;
-        switch (ClientGameData.getGameDifficulty()) {
-            case ClientGameData.DIFFICULTY_EASY:
-                difficultyColor = 0x55FF55; // Green
-                break;
-            case ClientGameData.DIFFICULTY_HARD:
-                difficultyColor = 0xFF5555; // Red
-                break;
-            default:
-                difficultyColor = 0xFFAA00; // Orange/Yellow
-        }
-
-        graphics.drawString(Minecraft.getInstance().font, difficulty, x + 10, y + 25, difficultyColor);
-        graphics.drawString(Minecraft.getInstance().font, timeEstimate, x + 100, y + 25, 0xFFFFFF);
+                furnaceType + " Recipe", x + recipeWidth / 2, y + 4, 0xFFFFFF);
 
         // Get the input item
         ItemStack inputStack = ItemStack.EMPTY;
@@ -303,7 +259,7 @@ public class RecipeDisplayOverlay {
 
         // Input position
         int inputX = x + 56;
-        int inputY = y + 36;
+        int inputY = y + 17;
 
         if (!inputStack.isEmpty()) {
             graphics.renderItem(inputStack, inputX, inputY);
@@ -313,24 +269,14 @@ public class RecipeDisplayOverlay {
         // Draw fuel
         ItemStack fuelStack = new ItemStack(Items.COAL);
         int fuelX = x + 56;
-        int fuelY = y + 76;
+        int fuelY = y + 52;
         graphics.renderItem(fuelStack, fuelX, fuelY);
 
         // Result position
         int resultX = x + 116;
-        int resultY = y + 54;
+        int resultY = y + 36;
         graphics.renderItem(resultItem, resultX, resultY);
         graphics.renderItemDecorations(Minecraft.getInstance().font, resultItem, resultX, resultY, null);
-
-        // Draw fire and arrow
-        int fireX = x + 56;
-        int fireY = y + 54;
-        graphics.fill(fireX, fireY, fireX + 14, fireY + 14, 0xFFFF6600);
-
-        int arrowX = x + 80;
-        int arrowY = y + 54;
-        graphics.fill(arrowX, arrowY + 4, arrowX + 24, arrowY + 6, 0xFFFFFFFF);
-        graphics.fill(arrowX + 20, arrowY + 2, arrowX + 24, arrowY + 8, 0xFFFFFFFF);
 
         // Draw cooking time - fix for getCookingTime() method
         int cookingTime = 200; // Default cooking time
@@ -347,7 +293,7 @@ public class RecipeDisplayOverlay {
         }
 
         String cookTime = "Cook time: " + cookingTime + " ticks";
-        graphics.drawString(Minecraft.getInstance().font, cookTime, x + 50, y + 100, 0xFFAAAAAA);
+        graphics.drawString(Minecraft.getInstance().font, cookTime, x + 74, y + 70, 0xFFAAAAAA);
     }
 
     private static void renderMobDrops(GuiGraphics graphics, ItemStack targetItem, List<String> mobs, int width,
@@ -368,25 +314,6 @@ public class RecipeDisplayOverlay {
         // Title
         String title = "Mob Drop: " + targetItem.getHoverName().getString();
         graphics.drawCenteredString(Minecraft.getInstance().font, title, x + panelWidth / 2, y + 10, 0xFFFFFF);
-
-        // Add after title
-        String difficulty = "Difficulty: " + ClientGameData.getDifficultyName();
-        String timeEstimate = "Time: " + ClientGameData.getItemTimeMinutes() + " minutes";
-
-        int difficultyColor;
-        switch (ClientGameData.getGameDifficulty()) {
-            case ClientGameData.DIFFICULTY_EASY:
-                difficultyColor = 0x55FF55;
-                break;
-            case ClientGameData.DIFFICULTY_HARD:
-                difficultyColor = 0xFF5555;
-                break;
-            default:
-                difficultyColor = 0xFFAA00;
-        }
-
-        graphics.drawString(Minecraft.getInstance().font, difficulty, x + 20, y + 25, difficultyColor);
-        graphics.drawString(Minecraft.getInstance().font, timeEstimate, x + panelWidth - 120, y + 25, 0xFFFFFF);
 
         // Draw target item
         int itemX = x + panelWidth / 2 - 8;
@@ -424,25 +351,6 @@ public class RecipeDisplayOverlay {
         // Title
         String title = "How to Get: " + targetItem.getHoverName().getString();
         graphics.drawCenteredString(Minecraft.getInstance().font, title, x + panelWidth / 2, y + 10, 0xFFFFFF);
-
-        // Add after title
-        String difficulty = "Difficulty: " + ClientGameData.getDifficultyName();
-        String timeEstimate = "Time: " + ClientGameData.getItemTimeMinutes() + " minutes";
-
-        int difficultyColor;
-        switch (ClientGameData.getGameDifficulty()) {
-            case ClientGameData.DIFFICULTY_EASY:
-                difficultyColor = 0x55FF55;
-                break;
-            case ClientGameData.DIFFICULTY_HARD:
-                difficultyColor = 0xFF5555;
-                break;
-            default:
-                difficultyColor = 0xFFAA00;
-        }
-
-        graphics.drawString(Minecraft.getInstance().font, difficulty, x + 20, y + 25, difficultyColor);
-        graphics.drawString(Minecraft.getInstance().font, timeEstimate, x + panelWidth - 120, y + 25, 0xFFFFFF);
 
         // Draw target item
         int itemX = x + panelWidth / 2 - 8;
