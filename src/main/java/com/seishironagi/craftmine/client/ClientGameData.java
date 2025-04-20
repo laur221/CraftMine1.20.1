@@ -106,7 +106,27 @@ public class ClientGameData {
     }
 
     public static void setGameDifficulty(int difficulty) {
-        gameDifficulty = difficulty;
+        // Verifică dacă se schimbă cu adevărat dificultatea
+        if (gameDifficulty != difficulty) {
+            gameDifficulty = difficulty;
+            // Actualizează și timpul pentru item când se schimbă dificultatea
+            updateItemTimeForDifficulty();
+        }
+    }
+
+    private static void updateItemTimeForDifficulty() {
+        // Stabilește timpul corect bazat pe dificultate
+        switch (gameDifficulty) {
+            case DIFFICULTY_EASY:
+                itemTimeMinutes = 5; // timpul pentru easy
+                break;
+            case DIFFICULTY_MEDIUM:
+                itemTimeMinutes = 15; // timpul pentru medium
+                break;
+            case DIFFICULTY_HARD:
+                itemTimeMinutes = 35; // timpul pentru hard
+                break;
+        }
     }
 
     public static int getGameDifficulty() {
@@ -126,7 +146,10 @@ public class ClientGameData {
     }
 
     public static void setItemTimeMinutes(int minutes) {
-        itemTimeMinutes = minutes;
+        // Actualizează timpul doar dacă este diferit
+        if (itemTimeMinutes != minutes) {
+            itemTimeMinutes = minutes;
+        }
     }
 
     public static int getItemTimeMinutes() {

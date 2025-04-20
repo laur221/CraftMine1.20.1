@@ -441,7 +441,11 @@ public class GameManager {
                     itemId.contains("mycelium") || // Mycelium
                     itemId.contains("bookshelf") || // Bookshelves
                     itemId.contains("campfire") || // Campfires
-                    itemId.contains("beehive")) { // Beehives
+                    itemId.contains("beehive") || // Beehives
+                    itemId.contains("redstone_lamp") // Redstone lamps
+                    
+                    
+        ) { 
                 continue;
             }
 

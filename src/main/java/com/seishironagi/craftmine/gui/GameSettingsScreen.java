@@ -1,6 +1,5 @@
 package com.seishironagi.craftmine.gui;
 
-import com.seishironagi.craftmine.Config;
 import com.seishironagi.craftmine.difficulty.DifficultyManager;
 import com.seishironagi.craftmine.gui.util.GuiTheme;
 import com.seishironagi.craftmine.network.ModMessages;
@@ -20,7 +19,7 @@ import java.util.List;
 public class GameSettingsScreen extends Screen {
     // Panel dimensions
     private int imageWidth = 260;
-    private int imageHeight = 200;
+    private int imageHeight = 160;
     private int leftPos;
     private int topPos;
 
@@ -52,7 +51,7 @@ public class GameSettingsScreen extends Screen {
 
         // Add buttons for settings
         int centerX = this.width / 2 - BUTTON_WIDTH / 2;
-        int startY = this.topPos + 45;
+        int startY = this.topPos + 30;
 
         // Clear button list
         buttons.clear();
@@ -157,17 +156,17 @@ public class GameSettingsScreen extends Screen {
 
     private void renderSettingsInfo(GuiGraphics graphics) {
         int textX = leftPos + 20;
-        int textY = topPos + imageHeight - 70;
+        int textY = topPos + imageHeight - 60;
         int lineHeight = 12;
 
         DifficultyManager difficultyManager = DifficultyManager.getInstance();
 
-        // Draw difficulty description
+        // Draw difficulty description with updated timings
         String[] difficultyInfo = {
                 "§e§lCurrent Difficulty: §f" + difficultyManager.getDifficultyName(),
-                "§7Easy: Simple items, 2-3 minutes",
-                "§7Medium: Moderate items, 4-5 minutes",
-                "§7Hard: Complex items, 6-8 minutes"
+                "§7Easy: Simple items, 3-7 minutes",
+                "§7Medium: Moderate items, 8-15 minutes",
+                "§7Hard: Complex items, 15-35 minutes"
         };
 
         for (String line : difficultyInfo) {

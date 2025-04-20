@@ -21,6 +21,8 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.world.item.Item;
+import net.minecraft.ChatFormatting;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -589,5 +591,76 @@ public class RecipeDisplayOverlay {
         String noRecipe = "No information available";
         graphics.drawCenteredString(Minecraft.getInstance().font, noRecipe,
                 x + panelWidth / 2, y + panelHeight - 15, 0xFFAAAA);
+    }
+
+    private static void renderRecipeInfo(GuiGraphics graphics, ItemStack targetItem) {
+        if (!showRecipe || targetItem == null || targetItem.isEmpty())
+            return;
+
+        Item item = targetItem.getItem();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null)
+            return;
+
+        RecipeManager recipeManager = minecraft.level.getRecipeManager();
+        String itemId = ForgeRegistries.ITEMS.getKey(item).toString();
+
+        // Check if it's a craftable item
+        if (isCraftableItem(item)) {
+            renderCraftingRecipe(graphics, findCraftingRecipe(item, recipeManager).orElse(null), targetItem,
+                    minecraft.getWindow().getGuiScaledWidth(),
+                    minecraft.getWindow().getGuiScaledHeight());
+            return;
+        }
+
+        // Check if it's a cookable item
+        Optional<SmeltingRecipe> smeltRecipe = findSmeltingRecipe(item, recipeManager);
+        if (smeltRecipe.isPresent()) {
+            renderFurnaceRecipe(graphics, smeltRecipe.get(), new ItemStack(item), "Furnace",
+                    minecraft.getWindow().getGuiScaledWidth(),
+                    minecraft.getWindow().getGuiScaledHeight());
+            return;
+        }
+
+        // Check if it's a mob drop
+        List<String> mobDrops = MOB_DROPS.get(itemId);
+        if (mobDrops != null && !mobDrops.isEmpty()) {
+            renderMobDrops(graphics, new ItemStack(item), mobDrops,
+                    minecraft.getWindow().getGuiScaledWidth(),
+                    minecraft.getWindow().getGuiScaledHeight());
+            return;
+        }
+
+        // For all other items, show mining info
+        renderMiningInfo(graphics, new ItemStack(item),
+                minecraft.getWindow().getGuiScaledWidth(),
+                minecraft.getWindow().getGuiScaledHeight());
+    }
+
+    private static Optional<ShapedRecipe> findCraftingRecipe(Item item, RecipeManager recipeManager) {
+        return recipeManager.getAllRecipesFor(RecipeType.CRAFTING).stream()
+                .filter(recipe -> recipe instanceof ShapedRecipe)
+                .map(recipe -> (ShapedRecipe) recipe)
+                .filter(recipe -> ItemStack.isSameItem(
+                        recipe.getResultItem(Minecraft.getInstance().level.registryAccess()),
+                        new ItemStack(item)))
+                .findFirst();
+    }
+
+    private static boolean isCraftableItem(Item item) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null)
+            return false;
+
+        RecipeManager recipeManager = minecraft.level.getRecipeManager();
+        return findCraftingRecipe(item, recipeManager).isPresent();
+    }
+
+    private static Optional<SmeltingRecipe> findSmeltingRecipe(Item item, RecipeManager recipeManager) {
+        return recipeManager.getAllRecipesFor(RecipeType.SMELTING).stream()
+                .filter(recipe -> ItemStack.isSameItem(
+                        recipe.getResultItem(Minecraft.getInstance().level.registryAccess()),
+                        new ItemStack(item)))
+                .findFirst();
     }
 }

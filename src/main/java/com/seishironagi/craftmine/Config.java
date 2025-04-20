@@ -115,7 +115,7 @@ public class Config {
             "minecraft:diamond_chestplate", "minecraft:diamond_leggings", "minecraft:diamond_boots",
 
             // Special overworld items that don't require Nether/End
-            "minecraft:jukebox", "minecraft:observer", "minecraft:composter",
+            "minecraft:jukebox", "minecraft:composter",
             "minecraft:golden_block", "minecraft:obsidian", "minecraft:emerald",
 
             // Advanced redstone
@@ -168,13 +168,6 @@ public class Config {
         blueTeamWinMessageConfig = COMMON_BUILDER
                 .comment("Message when Blue Team wins")
                 .define("blueTeamWinMessage", "The Blue Team has won!");
-
-        // Define default items for the game
-        List<String> defaultItems = Arrays.asList(
-                "minecraft:diamond",
-                "minecraft:emerald",
-                "minecraft:gold_ingot",
-                "minecraft:iron_ingot");
 
         easyTimeConfig = COMMON_BUILDER
                 .comment("Time (minutes) for EASY items")
