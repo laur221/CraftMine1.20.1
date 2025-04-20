@@ -182,12 +182,36 @@ public class ModEvents {
 
         // Check if the player is frozen
         if (GameManager.getInstance().isGameRunning() && GameManager.getInstance().isPlayerFrozen(event.player)) {
-            // Prevent movement by resetting position and motion
-            event.player.setDeltaMovement(0, event.player.getDeltaMovement().y, 0);
+            // Get player's freeze position from the freeze manager
+            BlockPos freezePos = GameManager.getInstance().getFreezePosition(event.player);
+            if (freezePos != null) {
+                // Strong freeze: reset position completely
+                double x = freezePos.getX() + 0.5;
+                double y = freezePos.getY();
+                double z = freezePos.getZ() + 0.5;
 
-            // Allow slight vertical movement (falling)
-            if (event.player.getDeltaMovement().y > 0) {
+                // Check if player moved beyond a small threshold (tolerance for network jitter)
+                double distSq = event.player.distanceToSqr(x, y, z);
+                if (distSq > 0.01) {
+                    // Teleport player back to freeze position
+                    event.player.teleportTo(x, y, z);
+                }
+
+                // Always cancel motion completely
                 event.player.setDeltaMovement(0, 0, 0);
+            } else {
+                // If no freeze position is recorded, record the current one
+                GameManager.getInstance().recordFreezePosition(event.player,
+                        new BlockPos((int) event.player.getX(), (int) event.player.getY(), (int) event.player.getZ()));
+
+                // Cancel motion
+                event.player.setDeltaMovement(0, 0, 0);
+            }
+
+            // Visual feedback
+            if (event.player.tickCount % 20 == 0) { // Once per second
+                event.player.displayClientMessage(
+                        Component.literal("You are frozen! Please wait...").withStyle(ChatFormatting.AQUA), true);
             }
         }
     }

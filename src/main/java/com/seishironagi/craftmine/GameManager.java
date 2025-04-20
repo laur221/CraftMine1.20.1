@@ -33,6 +33,7 @@ public class GameManager {
 
     // Map to track frozen players and when they should unfreeze
     private final Map<UUID, Long> frozenPlayers = new HashMap<>();
+    private final Map<UUID, BlockPos> freezePositions = new HashMap<>();
     private boolean timerStarted = false;
     private long timerStartDelayMillis = 0;
 
@@ -123,13 +124,10 @@ public class GameManager {
         // Starting message
         broadcastMessage("Starting new game! Please wait...", ChatFormatting.GOLD);
 
-        // First, send target item message with difficulty info to red team
+        // Send difficulty info only - remove duplicate message to red team
         String itemName = targetItem.getDescription().getString();
         String difficultyInfo = difficultyManager.getSettingsDescription(targetItem, gameTimeSeconds);
         redPlayer.sendSystemMessage(Component.literal(difficultyInfo).withStyle(ChatFormatting.GOLD));
-
-        String redMessage = String.format(Config.redTeamTaskMessage, itemName, gameTimeMinutes);
-        redPlayer.sendSystemMessage(Component.literal(redMessage).withStyle(ChatFormatting.GOLD));
 
         // teleportăm jucătorii în OVERWORLD, coordonate random la distanță mare
         int base = 2000, range = 3000;
@@ -176,11 +174,13 @@ public class GameManager {
 
     private void updateFreezeStatus() {
         // Check if timer needs to be started
-        if (!timerStarted && System.currentTimeMillis() >= timerStartDelayMillis) {
+        if (gameRunning && !timerStarted && System.currentTimeMillis() >= timerStartDelayMillis) {
             timerStarted = true;
             // now start countdown based on seconds
             gameEndTimeMillis = System.currentTimeMillis() + (gameTimeSeconds * 1000L);
-            broadcastMessage("Timer has started! The game is now in progress.", ChatFormatting.GOLD);
+
+            // Only broadcast timer started message when game is definitely running
+            broadcastMessage("The hunt begins!", ChatFormatting.GOLD);
         }
     }
 
@@ -231,11 +231,16 @@ public class GameManager {
         if (!gameRunning)
             return;
 
+        // Cancel timer task immediately to prevent any further messages
         if (displayTask != null) {
             displayTask.cancel();
             displayTask = null;
         }
 
+        // Set gameRunning to false early to prevent any race conditions
+        gameRunning = false;
+
+        // Then show appropriate win message
         if (redTeamWin) {
             broadcastMessage(Config.redTeamWinMessage, ChatFormatting.GOLD);
         } else {
@@ -263,10 +268,10 @@ public class GameManager {
         }
 
         // Reset game state
-        gameRunning = false;
         targetItem = null;
         timerStarted = false;
         frozenPlayers.clear();
+        freezePositions.clear();
     }
 
     /**
@@ -310,6 +315,7 @@ public class GameManager {
         targetItem = null;
         timerStarted = false;
         frozenPlayers.clear();
+        freezePositions.clear();
     }
 
     public void resetGame() {
@@ -327,21 +333,39 @@ public class GameManager {
         gameRunning = false;
         timerStarted = false;
         frozenPlayers.clear();
+        freezePositions.clear();
     }
 
     public void applyFreezeEffect(Player player, int seconds) {
         long unfreezeTime = System.currentTimeMillis() + (seconds * 1000L);
         frozenPlayers.put(player.getUUID(), unfreezeTime);
 
+        // Record freeze position
+        recordFreezePosition(player, new BlockPos((int) player.getX(), (int) player.getY(), (int) player.getZ()));
+
         // If this is the red team player, also delay the timer start
         if (teamManager.isRedTeam(player)) {
             timerStarted = false;
             timerStartDelayMillis = System.currentTimeMillis() + (seconds * 1000L);
         }
+
+        // Send a clear message to the player
+        player.sendSystemMessage(Component.literal("You are frozen for " + seconds + " seconds!")
+                .withStyle(ChatFormatting.AQUA));
+    }
+
+    public BlockPos getFreezePosition(Player player) {
+        return freezePositions.get(player.getUUID());
+    }
+
+    public void recordFreezePosition(Player player, BlockPos pos) {
+        freezePositions.put(player.getUUID(), pos);
     }
 
     public boolean isPlayerFrozen(Player player) {
         if (!frozenPlayers.containsKey(player.getUUID())) {
+            // Also clear freeze position
+            freezePositions.remove(player.getUUID());
             return false;
         }
 
@@ -349,6 +373,7 @@ public class GameManager {
         if (System.currentTimeMillis() >= unfreezeTime) {
             // Player is no longer frozen
             frozenPlayers.remove(player.getUUID());
+            freezePositions.remove(player.getUUID());
 
             // Notify player
             player.sendSystemMessage(Component.literal("You are now unfrozen! Go!")
@@ -398,6 +423,13 @@ public class GameManager {
                     itemId.contains("budding") || itemId.contains("calcite") ||
                     itemId.contains("tuff") || itemId.contains("suspicious") ||
                     itemId.contains("decorated") ||
+                    // New excluded items
+                    itemId.contains("lead") || itemId.contains("beacon") ||
+                    // Additional complex crafting items requiring rare materials
+                    itemId.contains("brewing_stand") || itemId.contains("ender_chest") ||
+                    itemId.contains("respawn_anchor") || itemId.contains("enchanting_table") ||
+                    itemId.contains("anvil") || itemId.contains("lodestone") ||
+                    itemId.contains("conduit") || itemId.contains("end_crystal") ||
                     // Exclude silk touch obtainable blocks
                     itemId.contains("_ore") || // All ore blocks
                     itemId.contains("ice") || // All ice variants

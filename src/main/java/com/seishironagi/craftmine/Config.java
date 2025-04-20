@@ -68,7 +68,8 @@ public class Config {
     private static ForgeConfigSpec.IntValue hardTimeConfig;
     private static ForgeConfigSpec.IntValue gameDifficultyConfig;
 
-    // Define sets of item IDs for dynamic estimation based on actual gameplay difficulty
+    // Define sets of item IDs for dynamic estimation based on actual gameplay
+    // difficulty
     private static final Set<String> EASY_ITEMS = Set.of(
             // Basic resources - very quick to obtain
             "minecraft:dirt", "minecraft:cobblestone", "minecraft:oak_planks", "minecraft:stick",
@@ -88,8 +89,7 @@ public class Config {
             "minecraft:pink_dye", "minecraft:gray_dye", "minecraft:light_gray_dye",
             "minecraft:cyan_dye", "minecraft:purple_dye", "minecraft:blue_dye",
             "minecraft:brown_dye", "minecraft:green_dye", "minecraft:red_dye", "minecraft:black_dye",
-            "minecraft:dandelion", "minecraft:poppy", "minecraft:blue_orchid", "minecraft:oxeye_daisy"
-    );
+            "minecraft:dandelion", "minecraft:poppy", "minecraft:blue_orchid", "minecraft:oxeye_daisy");
 
     private static final Set<String> MEDIUM_ITEMS = Set.of(
             // Mid-tier resources - require mining
@@ -102,27 +102,25 @@ public class Config {
             // Mid-tier weapons
             "minecraft:bow", "minecraft:crossbow", "minecraft:arrow", "minecraft:spectral_arrow",
             // Mid-tier crafted items
-            "minecraft:fishing_rod", "minecraft:compass", "minecraft:clock", 
+            "minecraft:fishing_rod", "minecraft:compass", "minecraft:clock",
             "minecraft:shears", "minecraft:bucket", "minecraft:cauldron",
             // Mid-tier food and farming
             "minecraft:golden_carrot", "minecraft:cooked_beef", "minecraft:cooked_porkchop",
-            "minecraft:cake", "minecraft:pumpkin_pie", "minecraft:mushroom_stew"
-    );
+            "minecraft:cake", "minecraft:pumpkin_pie", "minecraft:mushroom_stew");
 
     private static final Set<String> HARD_ITEMS = Set.of(
             // Diamond tier
             "minecraft:diamond", "minecraft:diamond_pickaxe", "minecraft:diamond_sword",
             "minecraft:diamond_axe", "minecraft:diamond_shovel", "minecraft:diamond_helmet",
             "minecraft:diamond_chestplate", "minecraft:diamond_leggings", "minecraft:diamond_boots",
-            // Special overworld items
-            "minecraft:enchanting_table", "minecraft:anvil", "minecraft:jukebox",
-            "minecraft:lodestone", "minecraft:beehive", "minecraft:composter",
+
+            // Special overworld items that don't require Nether/End
+            "minecraft:jukebox", "minecraft:observer", "minecraft:composter",
+            "minecraft:golden_block", "minecraft:obsidian", "minecraft:emerald",
+
             // Advanced redstone
             "minecraft:dispenser", "minecraft:dropper", "minecraft:observer",
-            "minecraft:repeater", "minecraft:comparator", "minecraft:daylight_detector",
-            // Special overworld resources
-            "minecraft:emerald", "minecraft:obsidian", "minecraft:golden_block"
-    );
+            "minecraft:repeater", "minecraft:comparator", "minecraft:daylight_detector");
 
     static {
         COMMON_BUILDER.comment("Game Settings");
@@ -183,10 +181,10 @@ public class Config {
                 .defineInRange("easyItemTime", 5, 1, 120);
         mediumTimeConfig = COMMON_BUILDER
                 .comment("Time (minutes) for MEDIUM items")
-                .defineInRange("mediumItemTime", 10, 1, 120);
+                .defineInRange("mediumItemTime", 15, 1, 120); // Increased from 10 to 15
         hardTimeConfig = COMMON_BUILDER
                 .comment("Time (minutes) for HARD items")
-                .defineInRange("hardItemTime", 15, 1, 120);
+                .defineInRange("hardItemTime", 35, 1, 120); // Increased from 25 to 35
 
         // define grouped item lists
         easyItemsConfig = COMMON_BUILDER
@@ -304,6 +302,7 @@ public class Config {
         int baseTime;
         int variationRange;
 
+        // Remove specific handling for items we've excluded
         if (EASY_ITEMS.contains(id)) {
             // Easy items: 3-7 minutes
             baseTime = 180; // 3 minutes base
@@ -313,9 +312,9 @@ public class Config {
             baseTime = 480; // 8 minutes base
             variationRange = 420; // up to 7 additional minutes
         } else if (HARD_ITEMS.contains(id)) {
-            // Hard items: 15-30 minutes
+            // Hard items: 15-35 minutes
             baseTime = 900; // 15 minutes base
-            variationRange = 900; // up to 15 additional minutes
+            variationRange = 1200; // up to 20 additional minutes
         } else {
             // Unknown items: 10-20 minutes
             baseTime = 600; // 10 minutes base

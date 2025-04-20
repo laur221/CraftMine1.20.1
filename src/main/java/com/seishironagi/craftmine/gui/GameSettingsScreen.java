@@ -99,6 +99,11 @@ public class GameSettingsScreen extends Screen {
         String difficultyText = "§l§eDifficulty: §f" + DIFFICULTY_NAMES[newDifficulty];
         difficultyButton.setMessage(Component.literal(difficultyText));
 
+        // Update the button color immediately
+        if (difficultyButton instanceof GameControllerScreen.AnimatedButton animButton) {
+            animButton.setButtonColor(DIFFICULTY_COLORS[newDifficulty]);
+        }
+
         // Send packet to server to update difficulty
         ModMessages.sendToServer(new SetGameDifficultyC2SPacket(newDifficulty));
     }

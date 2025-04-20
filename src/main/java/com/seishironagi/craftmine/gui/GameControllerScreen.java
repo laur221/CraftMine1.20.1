@@ -146,7 +146,7 @@ public class GameControllerScreen extends Screen {
     // Custom animated button class with team colors
     public static class AnimatedButton extends Button {
         private final int index;
-        private final int buttonColor;
+        private int buttonColor;
         private float animProgress = 0;
         private int baseX;
 
@@ -157,6 +157,11 @@ public class GameControllerScreen extends Screen {
             this.baseX = x;
             this.buttonColor = color;
             this.active = false; // Start inactive until animation completes
+        }
+
+        // Add the missing method to set button color
+        public void setButtonColor(int color) {
+            this.buttonColor = color;
         }
 
         @Override

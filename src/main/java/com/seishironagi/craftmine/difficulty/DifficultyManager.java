@@ -27,9 +27,9 @@ public class DifficultyManager {
 
     // Time ranges per difficulty (in seconds)
     private final int[][] timeRanges = {
-            { 120, 180 }, // Easy: 2-3 minutes
-            { 240, 300 }, // Medium: 4-5 minutes
-            { 360, 480 } // Hard: 6-8 minutes
+            { 180, 300 }, // Easy: 3-5 minutes
+            { 360, 600 }, // Medium: 6-10 minutes
+            { 1200, 2100 } // Hard: 20-35 minutes (increased from 15-25 minutes)
     };
 
     private final Random random = new Random();

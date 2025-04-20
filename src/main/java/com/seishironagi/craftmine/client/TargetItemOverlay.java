@@ -25,7 +25,7 @@ public class TargetItemOverlay {
         ItemStack targetItem = ClientGameData.getTargetItem();
 
         // Position next to hotbar for better visibility underground
-        int x = width / 2 + 90; // Right side of hotbar
+        int x = width / 2 + 100; // Right side of hotbar
         int y = height - 19; // Aligned with hotbar
 
         // Draw target item with enhanced visibility for underground environments
